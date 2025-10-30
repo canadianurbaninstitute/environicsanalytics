@@ -8,8 +8,7 @@ init_credentials(
   client_id = Sys.getenv("CLIENT_ID"),
   client_secret = Sys.getenv("CLIENT_SECRET"),
   scope = Sys.getenv("SCOPE", "mobilescapes"),
-  token_url = "https://login.environicsanalytics.com/connect/token",
-  api_base_url = "https://api.environicsanalytics.com/mobilescapes/v4/ca"
+  token_url = "https://login.environicsanalytics.com/connect/token"
 )
 }
 \arguments{
@@ -20,8 +19,6 @@ init_credentials(
 \item{scope}{Character. OAuth scope (default: "mobilescapes")}
 
 \item{token_url}{Character. Token endpoint URL}
-
-\item{api_base_url}{Character. API base URL}
 }
 \value{
 Invisibly TRUE if credentials are valid, stops with error otherwise

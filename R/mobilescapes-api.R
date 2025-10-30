@@ -4,16 +4,17 @@
 #' @param geography sf object or GeoJSON list
 #'
 #' @return A cleaned GeoJSON list object
-clean_geojson <- function(geography) {
+#' @keywords internal
+.clean_geojson <- function(geography) {
   cat("\nCleaning geography for API...\n")
 
   # Handle sf objects - convert to GeoJSON list
   if (inherits(geography, "sf")) {
     # Transform back to WGS84 (EPSG:4326) for GeoJSON output
     # RFC 7946 requires WGS84 coordinates
-    if (st_crs(geography)$epsg != 4326) {
+    if (sf::st_crs(geography)$epsg != 4326) {
       cat("Transforming back to WGS84 (EPSG:4326) for GeoJSON output...\n")
-      geography <- st_transform(geography, 4326)
+      geography <- sf::st_transform(geography, 4326)
     }
 
     geojson <- jsonlite::fromJSON(
@@ -101,7 +102,8 @@ clean_geojson <- function(geography) {
 #' \dontrun{
 #' result <- process_geojson_file("large_area.geojson", output_filepath = "split_output.geojson")
 #' }
-process_geojson_file <- function(filepath,
+#' @keywords internal
+.process_geojson_file <- function(filepath,
                                  max_area_sqft = 5000000,
                                  safety_factor = 1.05,
                                  output_filepath = NULL) {
@@ -109,29 +111,31 @@ process_geojson_file <- function(filepath,
   cat(sprintf("Reading GeoJSON from: %s\n", filepath))
 
   # Read GeoJSON file as sf object
-  geography_sf <- st_read(filepath, quiet = TRUE)
+  geography_sf <- sf::st_read(filepath, quiet = TRUE)
 
   cat(sprintf("Loaded %d feature(s)\n", nrow(geography_sf)))
 
   # Check if splitting is needed
-  cat("\nChecking feature areas...\n")
-  needs_processing <- !check_feature_area(geography_sf, max_area_sqft)
+  cat("\n========================================\n")
+  cat("Checking feature areas... ")
+  needs_processing <- !.check_feature_area(geography_sf, max_area_sqft)
+  cat("========================================\n")
 
   if (needs_processing) {
     # Split large features
-    geography_split <- split_large_geographies(geography_sf, max_area_sqft, safety_factor)
+    geography_split <- .split_large_geographies(geography_sf, max_area_sqft, safety_factor)
   } else {
     geography_split <- geography_sf
   }
 
   # Convert to clean GeoJSON
-  clean_json <- clean_geojson(geography_split)
+  clean_json <- .clean_geojson(geography_split)
 
   # Optionally save to file
   if (!is.null(output_filepath)) {
     cat(sprintf("\nSaving result to: %s\n", output_filepath))
     jsonlite::write_json(clean_json, output_filepath, pretty = TRUE, auto_unbox = TRUE)
-    cat("✓ File saved successfully\n")
+    cat("\u2713 File saved successfully\n")
   }
 
   invisible(clean_json)
@@ -160,7 +164,7 @@ process_geojson_file <- function(filepath,
 #' @return List containing the request body parameters.
 #'
 #' @keywords internal
-make_request_body <- function(
+.make_request_body <- function(
     start_datetime,
     end_datetime,
     geojson,
@@ -204,7 +208,7 @@ make_request_body <- function(
 
   # Clean GeoJSON for API compliance
   if (!is.null(geojson)) {
-    body_list$geoJson <- process_geojson_file(
+    body_list$geoJson <- .process_geojson_file(
       geojson,
       5000000,
       1.05
@@ -231,7 +235,10 @@ make_request_body <- function(
 #' @return List with status information, or NULL if error.
 #'
 #' @keywords internal
-get_request_status <- function(bearer_token, request_id) {
+.get_request_status <- function(bearer_token, request_id) {
+
+  API_BASE_URL <- "https://api.environicsanalytics.com/mobilescapes/v4/ca"
+
   req <- httr2::request(paste0(API_BASE_URL, "/requests/", request_id, "/status")) |>
     httr2::req_auth_bearer_token(bearer_token) |>
     httr2::req_error(body = function(resp) {
@@ -252,8 +259,10 @@ get_request_status <- function(bearer_token, request_id) {
 #' @return List with Azure storage details (storageUrl, containerName, sasToken, blobList).
 #'
 #' @keywords internal
-get_request_results <- function(bearer_token, request_id) {
+.get_request_results <- function(bearer_token, request_id) {
   cat("Getting result information...\n")
+
+  API_BASE_URL <- "https://api.environicsanalytics.com/mobilescapes/v4/ca"
 
   req <- httr2::request(paste0(API_BASE_URL, "/requests/", request_id, "/resultInfo")) |>
     httr2::req_auth_bearer_token(bearer_token) |>
@@ -276,13 +285,13 @@ get_request_results <- function(bearer_token, request_id) {
 #' @return Character vector of downloaded file paths, or NULL if error.
 #'
 #' @keywords internal
-download_results <- function(bearer_token, request_id, output_dir = "temp") {
+.download_results <- function(bearer_token, request_id, output_dir = "temp") {
   cat("\n========================================\n")
   cat("Downloading results...\n")
   cat("========================================\n")
 
   # Get result information
-  result_info <- get_request_results(bearer_token, request_id)
+  result_info <- .get_request_results(bearer_token, request_id)
 
   if (is.null(result_info)) {
     cat("ERROR: Could not get result information\n")
@@ -352,7 +361,7 @@ download_results <- function(bearer_token, request_id, output_dir = "temp") {
 #' @return Named list with paths to consolidated 'cel' and 'cdl' files.
 #'
 #' @keywords internal
-merge_api_chunks <- function(download_dir, output_dir, geography_name, start_datetime, end_datetime) {
+.merge_api_chunks <- function(download_dir, output_dir = "output", geography_name, start_datetime, end_datetime) {
   cat("\n========================================\n")
   cat("Merging API result chunks...\n")
   cat("========================================\n")
@@ -442,6 +451,8 @@ merge_api_chunks <- function(download_dir, output_dir, geography_name, start_dat
   cat("Merge complete!\n")
   cat("========================================\n")
 
+
+  unlink(download_dir, recursive = TRUE)
   return(result_files)
 }
 
@@ -486,9 +497,11 @@ test_query_mobilescapes <- function(
     report_type = "celcdl",
     data_vintage = NULL
 ) {
-  cat("Submitting DRY MobileScapes request...\n")
+  cat("Saving DRY MobileScapes request...\n")
 
-  body <- make_request_body(
+  API_BASE_URL <- "https://api.environicsanalytics.com/mobilescapes/v4/ca"
+
+  body <- .make_request_body(
     start_datetime = start_datetime,
     end_datetime = end_datetime,
     geojson = geojson,
@@ -567,10 +580,11 @@ pull_mobilescapes <- function(
     report_type = "celcdl",
     data_vintage = NULL
 ) {
+  cat("\n########################################\n")
 
   bearer_token <- get_bearer_token()
 
-  body <- make_request_body(
+  body <- .make_request_body(
     start_datetime = start_datetime,
     end_datetime = end_datetime,
     geojson = geojson,
@@ -586,6 +600,8 @@ pull_mobilescapes <- function(
     data_vintage = data_vintage
   )
 
+  API_BASE_URL <- "https://api.environicsanalytics.com/mobilescapes/v4/ca"
+
   # Create httr2 request
   req <- httr2::request(paste0(API_BASE_URL, "/requests")) |>
     httr2::req_auth_bearer_token(bearer_token) |>
@@ -599,21 +615,63 @@ pull_mobilescapes <- function(
       )
     })
 
-  cat("Submitting API request...\n")
+  cat("\nSubmitting API request...\n")
 
   # Print summary of submission
-  cat("\n=== Request Summary ===\n")
+  cat("\n========= Request Summary ==========\n")
   cat(sprintf("Date Range: %s to %s\n", start_datetime, end_datetime))
-  cat(sprintf("Report Type: %s\n", report_type))
 
+  # Geography parameters
+  if (!is.null(geofence_ids)) {
+    cat(sprintf("Geofence IDs: %d geofences\n", length(geofence_ids)))
+  }
+  if (!is.null(wkt_list)) {
+    cat(sprintf("WKT List: %d polygons\n", length(wkt_list)))
+  }
+  if (!is.null(geojson)) {
+    # Read the original file to count features
+    original_geojson <- sf::st_read(geojson, quiet = TRUE)
+    original_count <- nrow(original_geojson)
+
+    # Count features in the split version (from body)
+    split_count <- length(body$geoJson$features)
+
+    if (original_count == split_count) {
+      cat(sprintf("GeoJSON: %d feature(s)\n", split_count))
+    } else {
+      cat(sprintf("GeoJSON: %d feature(s) (split from %d original)\n",
+                  split_count, original_count))
+    }
+  }
+
+  # Processing parameters
+  cat(sprintf("Report Type: %s\n", report_type))
   cat(sprintf("Use Weights: %s\n", use_weights))
   cat(sprintf("Aggregate Polygons: %s\n", aggregate_polygons))
 
+  if (!is.null(aggregate_polygon_name)) {
+    cat(sprintf("Aggregate Polygon Name: %s\n", aggregate_polygon_name))
+  }
+
+  if (!is.null(data_vintage)) {
+    cat(sprintf("Data Vintage: %s\n", data_vintage))
+  }
+
+  # Segmentation
   if (!is.null(append_prizm_segmentation)) {
     cat(sprintf("PRIZM Segmentation: %s\n", append_prizm_segmentation))
   }
 
-  cat("======================\n\n")
+  # Filtering parameters
+  if (!is.null(daily_time_filter)) {
+    cat(sprintf("Daily Time Filter: %d filter(s) applied\n", length(daily_time_filter)))
+  }
+
+  if (!is.null(ping_filter)) {
+    cat(sprintf("Ping Filter: %s\n", ping_filter))
+  }
+
+  cat("====================================\n")
 
 
   # Perform request
@@ -621,7 +679,7 @@ pull_mobilescapes <- function(
   result <- httr2::resp_body_json(resp)
 
   request_id <- result$requestId
-  cat("Request successful!\nRequest ID:", request_id, "\n")
+  cat("\nRequest successful!\nRequest ID:", request_id, "\n")
 
   if (is.null(request_id)) {
     cat("ERROR: Failed to submit request.")
@@ -634,8 +692,8 @@ pull_mobilescapes <- function(
   cat("========================================\n")
 
   repeat {
-    bearer_token <- get_bearer_token()
-    request_status <- get_request_status(bearer_token, request_id)
+    bearer_token <- .quietly_get_bearer_token()
+    request_status <- .get_request_status(bearer_token, request_id)
 
     if (is.null(request_status)) {
       cat("Error: Failed to get request status. Aborting.\n")
@@ -660,7 +718,7 @@ pull_mobilescapes <- function(
       cat("========================================\n")
       return(NULL)
     } else {
-      cat("Current API status:", current_status, "- waiting 30 seconds...\n")
+      cat("Request status:", current_status, "(waiting 30s)\n")
       Sys.sleep(30)
     }
 
@@ -678,7 +736,7 @@ pull_mobilescapes <- function(
   end_time_clean <- gsub("[: ]", "_", end_datetime)
   geography_name <- paste0(geojson_data$name, "_", start_time_clean, "_to_", end_time_clean)
 
-  downloaded_files <- download_results(bearer_token, request_id, temp_dir)
+  downloaded_files <- .download_results(bearer_token, request_id, temp_dir)
 
   if (is.null(downloaded_files) || length(downloaded_files) == 0) {
     cat("ERROR: No files downloaded for", request_id, "\n")
@@ -687,7 +745,7 @@ pull_mobilescapes <- function(
 
   # Create final output directory for this geography's data
   final_output_dir <- paste0(output_base_dir, "/", geography_name)
-  merge_api_chunks(temp_dir, final_output_dir, geography_name, start_datetime, end_datetime)
+  .merge_api_chunks(temp_dir, final_output_dir, geography_name, start_datetime, end_datetime)
 
   cat("\n########################################\n")
   cat("COMPLETED:", geography_name, "\n")

@@ -10,7 +10,7 @@
 #' @importFrom sf st_transform st_area
 #'
 #' @keywords internal
-get_area_square_feet <- function(area) {
+.get_area_square_feet <- function(area) {
   # Transform to metric projected CRS for accurate area calculation (EPSG:3347 for Canada)
   geo_sf_3347 <- sf::st_transform(area, 3347)
 
@@ -31,9 +31,9 @@ get_area_square_feet <- function(area) {
 #' @return Logical. TRUE if ALL features are less than max_area_sqft, FALSE otherwise
 #'
 #' @keywords internal
-check_feature_area <- function(feature, max_area_sqft = 5000000) {
+.check_feature_area <- function(feature, max_area_sqft = 5000000) {
   # Calculate area for each individual feature in square ft
-  feature_areas_sqft <- get_area_square_feet(feature)
+  feature_areas_sqft <- .get_area_square_feet(feature)
 
   # Check if all features are within the limit
   features_over_limit <- which(feature_areas_sqft >= max_area_sqft)
@@ -68,7 +68,7 @@ check_feature_area <- function(feature, max_area_sqft = 5000000) {
 #' @importFrom sf st_transform st_make_grid st_intersection st_sf
 #'
 #' @keywords internal
-split_large_feature <- function(feature, max_area_sqft, safety_factor) {
+.split_large_feature <- function(feature, max_area_sqft, safety_factor) {
 
   # Transform to EPSG:3347 (Canada) for consistent area calculations
   feature_3347 <- sf::st_transform(feature, 3347)
@@ -98,12 +98,12 @@ split_large_feature <- function(feature, max_area_sqft, safety_factor) {
 
   for (i in seq_len(nrow(pieces))) {
     piece_sf <- pieces[i, ]
-    piece_area_sqft <- get_area_square_feet(piece_sf)
+    piece_area_sqft <- .get_area_square_feet(piece_sf)
 
     if (piece_area_sqft >= max_area_sqft) {
       cat(sprintf("Piece %d still exceeds max area (%.2f sq ft). Splitting recursively...\n",
                   i, piece_area_sqft))
-      pieces_list[[i]] <- split_large_feature(piece_sf, max_area_sqft, safety_factor)
+      pieces_list[[i]] <- .split_large_feature(piece_sf, max_area_sqft, safety_factor)
     } else {
       pieces_list[[i]] <- piece_sf
     }
@@ -113,7 +113,7 @@ split_large_feature <- function(feature, max_area_sqft, safety_factor) {
   result <- do.call(rbind, pieces_list)
   result$piece_id <- seq_len(nrow(result))
 
-  max_area <- max(get_area_square_feet(result))
+  max_area <- max(.get_area_square_feet(result))
   cat(sprintf("Final result: %d features, max area: %.2f sq ft\n", nrow(result), max_area))
 
   result
@@ -137,12 +137,12 @@ split_large_feature <- function(feature, max_area_sqft, safety_factor) {
 #'   have suffixed names (e.g., "original_name_1", "original_name_2")
 #'
 #' @keywords internal
-split_large_geographies <- function(geography, max_area_sqft = 5000000, safety_factor = 1.05) {
+.split_large_geographies <- function(geography, max_area_sqft = 5000000, safety_factor = 1.05) {
 
   cat(sprintf("\n=== Processing geography with %d features ===\n", nrow(geography)))
 
   # Calculate areas for all features
-  feature_areas <- get_area_square_feet(geography)
+  feature_areas <- .get_area_square_feet(geography)
 
   # Identify which features need splitting
   needs_splitting <- which(feature_areas >= max_area_sqft)
@@ -170,7 +170,7 @@ split_large_geographies <- function(geography, max_area_sqft = 5000000, safety_f
 
     if (i %in% needs_splitting) {
       cat(sprintf("\n--- Feature %d (%s): %.2f sq ft (EXCEEDS LIMIT) ---\n", i, feature_name, feature_area))
-      split_pieces <- split_large_feature(feature_sf, max_area_sqft, safety_factor)
+      split_pieces <- .split_large_feature(feature_sf, max_area_sqft, safety_factor)
 
       # Add Name column to split pieces with suffixes
       split_pieces$Name <- paste0(feature_name, "_", seq_len(nrow(split_pieces)))
@@ -194,10 +194,10 @@ split_large_geographies <- function(geography, max_area_sqft = 5000000, safety_f
   cat(sprintf("\n=== FINAL RESULT ===\n"))
   cat(sprintf("Input features: %d\n", nrow(geography)))
   cat(sprintf("Output features: %d\n", nrow(result)))
-  cat(sprintf("Max area: %.2f sq ft\n", max(get_area_square_feet(result))))
+  cat(sprintf("Max area: %.2f sq ft\n", max(.get_area_square_feet(result))))
 
   # Verify all features are below limit
-  if (check_feature_area(result, max_area_sqft)) {
+  if (.check_feature_area(result, max_area_sqft)) {
     cat("\u2713 Success! All features are now below the maximum area.\n")
   } else {
     warning("Some features still exceed the maximum area. Consider lowering the safety_factor.")

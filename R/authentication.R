@@ -13,7 +13,6 @@
 #' @param client_secret Character. OAuth client secret
 #' @param scope Character. OAuth scope (default: "mobilescapes")
 #' @param token_url Character. Token endpoint URL
-#' @param api_base_url Character. API base URL
 #'
 #' @return Invisibly TRUE if credentials are valid, stops with error otherwise
 #'
@@ -30,8 +29,8 @@ init_credentials <- function(
     client_id = Sys.getenv("CLIENT_ID"),
     client_secret = Sys.getenv("CLIENT_SECRET"),
     scope = Sys.getenv("SCOPE", "mobilescapes"),
-    token_url = "https://login.environicsanalytics.com/connect/token",
-    api_base_url = "https://api.environicsanalytics.com/mobilescapes/v4/ca") {
+    token_url = "https://login.environicsanalytics.com/connect/token"
+    ) {
 
   # Validate credentials are provided
   if (client_id == "" || client_secret == "") {
@@ -45,6 +44,7 @@ init_credentials <- function(
   cat("Verifying credentials...\n")
   tryCatch(
     {
+      dotenv::load_dot_env(".env")
       token <- .get_bearer_token_internal(
         client_id = client_id,
         client_secret = client_secret,
@@ -57,7 +57,6 @@ init_credentials <- function(
       .pkg_env$client_secret <- client_secret
       .pkg_env$scope <- scope
       .pkg_env$token_url <- token_url
-      .pkg_env$api_base_url <- api_base_url
       .pkg_env$token <- token
       .pkg_env$token_obtained_at <- Sys.time()
       .pkg_env$token_expires_in <- NULL  # Will be set by get_bearer_token
@@ -100,8 +99,7 @@ init_credentials <- function(
     client_id = .pkg_env$client_id,
     client_secret = .pkg_env$client_secret,
     scope = .pkg_env$scope,
-    token_url = .pkg_env$token_url,
-    api_base_url = .pkg_env$api_base_url
+    token_url = .pkg_env$token_url
   )
 }
 
@@ -135,6 +133,37 @@ init_credentials <- function(
   result <- httr2::resp_body_json(resp)
 
   return(result$access_token)
+}
+
+#' Get Valid Bearer Token Quietly
+#'
+#' Returns a valid bearer token, refreshing if necessary, without verbosity.
+#'
+#' @return Character. Valid bearer token string
+#'
+#' @examples
+#' \dontrun{
+#' init_credentials(
+#'   client_id = Sys.getenv("CLIENT_ID"),
+#'   client_secret = Sys.getenv("CLIENT_SECRET")
+#' )
+#' token <- get_bearer_token()
+#' }
+#'
+#' @export
+.quietly_get_bearer_token <- function() {
+  creds <- .get_credentials()
+
+  # Fetch new token
+  token <- .get_bearer_token_internal(
+    client_id = creds$client_id,
+    client_secret = creds$client_secret,
+    scope = creds$scope,
+    token_url = creds$token_url
+  )
+
+  .pkg_env$token <- token
+  return(token)
 }
 
 #' Get Valid Bearer Token

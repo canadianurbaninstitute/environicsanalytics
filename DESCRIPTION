@@ -10,12 +10,11 @@ Authors@R: c(
     )
   )
 Description: environicsanalytics provides R with functionality to retrieve data from the Environics Analytics API. Only the MobileScapes Endpoint is currently supported.
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports: 
     AzureStor,
-    dotenv,
     dplyr,
     geojsonio,
     httr2,
@@ -25,3 +24,6 @@ Imports:
 RoxygenNote: 7.3.3
 URL: https://github.com/canadianurbaninstitute/environicsanalytics
 BugReports: https://github.com/canadianurbaninstitute/environicsanalytics/issues
+Suggests:
+    dotenv
+Config/testthat/edition: 3
