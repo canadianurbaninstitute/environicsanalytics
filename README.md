@@ -116,7 +116,7 @@ debugging.
 
 ## API Notes
 
-The Environics Analytics MobileScapes API enforces **daily quotas** and **rate limits** to ensure fair and stable use of the service. All quotas reset at **05:00 AM UTC**.
+The Environics Analytics MobileScapes API enforces **daily quotas** and **rate limits**. All quotas reset at **05:00 AM UTC**.
 
 ### Daily Quotas
 
