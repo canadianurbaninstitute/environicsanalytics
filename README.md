@@ -1,9 +1,3 @@
----
-editor_options: 
-  markdown: 
-    wrap: 72
----
-
 # environicsanalytics
 
 R wrapper for the Environics Analytics API. Currently supports the
@@ -55,6 +49,8 @@ This will authenticate, submit the request, poll for completion, and
 download the results to your working directory in a folder called
 "output".
 
+Review the [Environics API Documentation](https://developers.environicsanalytics.com/) to get more specifics on how the parameters work in detail.
+
 ## Function Reference
 
 ### Authentication Functions
@@ -79,22 +75,21 @@ geography via GeoJSON file, geofence IDs, or WKT polygons. Handles
 request submission, polling, Azure download, and file consolidation.
 Returns CEL and CDL CSV files in the output directory.
 
-Parameters include: - `start_datetime`, `end_datetime`: Time range in
-"YYYY-MM-DD hh:mm:ss" format - `geojson`: Path to GeoJSON file (features
-will be split if they exceed size limits) - `geofence_ids`: Vector of EA
-geofence IDs (alternative to GeoJSON) - `wkt_list`: List of Well-Known
-Text polygon definitions (alternative to GeoJSON) - `use_weights`: Apply
-API mobile device weighting (default: TRUE) - `aggregate_polygons`:
-Aggregate results across polygons (default: TRUE) -
-`aggregate_polygon_name`: Custom name for aggregated results -
-`append_prizm_segmentation`: Add PRIZM segmentation (default: "prizm") -
-`daily_time_filter`: Filter for specific times/days of week -
-`ping_filter`: First ping filter ("first" or NULL) - `report_type`:
-Report type (default: "celcdl") -`data_vintage`: Specify data vintage
+Parameters include: 
+- `start_datetime`, `end_datetime`: Time range in "YYYY-MM-DD hh:mm:ss" format
+- `geojson`: Path to GeoJSON file (features will be split if they exceed size limits)
+- `geofence_ids`: Vector of EA geofence IDs (alternative to GeoJSON)
+- `wkt_list`: List of Well-Known Text polygon definitions (alternative to GeoJSON)
+- `use_weights`: Apply PI mobile device weighting (default: TRUE)
+- `aggregate_polygons`: Aggregate results across polygons (default: TRUE)
+- `aggregate_polygon_name`: Custom name for aggregated results
+- `append_prizm_segmentation`: Add PRIZM segmentation (default: "prizm")
+- `daily_time_filter`: Filter for specific times/days of week
+- `ping_filter`: First ping filter ("first" or NULL)
+- `report_type`: Report type (default: "celcdl")
+- `data_vintage`: Specify data vintage
 
-Review the [Environics API
-Documentation](https://developers.environicsanalytics.com/) to get more
-specifics on how the parameters work in detail
+Review the [Environics API Documentation](https://developers.environicsanalytics.com/) to get more specifics on how the parameters work in detail.
 
 ### Debugging Functions
 
