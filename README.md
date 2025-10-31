@@ -115,7 +115,7 @@ debugging.
 ## Contact
 
 -   **Maintainer**: Luca Carnegie
-    ([lcarnegie\@canurb.org](mailto:lcarnegie@canurb.org){.email})
+    ([lcarnegie\@canurb.org](mailto:lcarnegie@canurb.org))
 -   **GitHub**:
     <https://github.com/canadianurbaninstitute/environicsanalytics>
 -   **Issues**:
