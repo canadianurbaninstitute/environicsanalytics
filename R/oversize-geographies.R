@@ -68,7 +68,7 @@
 #' @importFrom sf st_transform st_make_grid st_intersection st_sf
 #'
 #' @keywords internal
-.split_large_feature <- function(feature, max_area_sqft, safety_factor) {
+.split_large_feature_grid <- function(feature, max_area_sqft, safety_factor) {
 
   # Transform to EPSG:3347 (Canada) for consistent area calculations
   feature_3347 <- sf::st_transform(feature, 3347)
@@ -103,7 +103,7 @@
     if (piece_area_sqft >= max_area_sqft) {
       cat(sprintf("Piece %d still exceeds max area (%.2f sq ft). Splitting recursively...\n",
                   i, piece_area_sqft))
-      pieces_list[[i]] <- .split_large_feature(piece_sf, max_area_sqft, safety_factor)
+      pieces_list[[i]] <- .split_large_feature_grid(piece_sf, max_area_sqft, safety_factor)
     } else {
       pieces_list[[i]] <- piece_sf
     }
@@ -170,7 +170,7 @@
 
     if (i %in% needs_splitting) {
       cat(sprintf("\n--- Feature %d (%s): %.2f sq ft (EXCEEDS LIMIT) ---\n", i, feature_name, feature_area))
-      split_pieces <- .split_large_feature(feature_sf, max_area_sqft, safety_factor)
+      split_pieces <- .split_large_feature_grid(feature_sf, max_area_sqft, safety_factor)
 
       # Add Name column to split pieces with suffixes
       split_pieces$Name <- paste0(feature_name, "_", seq_len(nrow(split_pieces)))

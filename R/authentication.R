@@ -44,7 +44,7 @@ init_credentials <- function(
   cat("Verifying credentials...\n")
   tryCatch(
     {
-      dotenv::load_dot_env(".env")
+      suppressWarnings(dotenv::load_dot_env(".env"))
       token <- .get_bearer_token_internal(
         client_id = client_id,
         client_secret = client_secret,

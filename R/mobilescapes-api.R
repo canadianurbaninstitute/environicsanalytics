@@ -89,7 +89,9 @@
 
 #' Process GeoJSON File: Split Large Features and Return Clean GeoJSON
 #'
-#' Main entry point - reads GeoJSON, splits large features, returns clean GeoJSON
+#' Reads in the GeoJson provided at the filepath, checks and (if needed) splits
+#' the features so that they are under the API's limit (5M sq ft), and processes
+#' the file to be
 #'
 #' @param filepath Character. Path to input GeoJSON file
 #' @param max_area_sqft Numeric. Maximum area in square feet (default: 5000000)
@@ -102,8 +104,8 @@
 #' \dontrun{
 #' result <- process_geojson_file("large_area.geojson", output_filepath = "split_output.geojson")
 #' }
-#' @keywords internal
-.process_geojson_file <- function(filepath,
+#' @export
+process_geojson_file <- function(filepath,
                                  max_area_sqft = 5000000,
                                  safety_factor = 1.05,
                                  output_filepath = NULL) {
@@ -482,7 +484,6 @@
 #'
 #' @export
 test_query_mobilescapes <- function(
-    bearer_token,
     start_datetime,
     end_datetime,
     geojson = NULL,
@@ -500,6 +501,8 @@ test_query_mobilescapes <- function(
   cat("Saving DRY MobileScapes request...\n")
 
   API_BASE_URL <- "https://api.environicsanalytics.com/mobilescapes/v4/ca"
+
+  bearer_token <- .quietly_get_bearer_token()
 
   body <- .make_request_body(
     start_datetime = start_datetime,
@@ -530,15 +533,13 @@ test_query_mobilescapes <- function(
       )
     })
 
-  sink("test_query.txt")
+  sink("test_mobilescapes_query.txt")
   dry_run <- httr2::req_dry_run(
     req,
     quiet = FALSE,
     redact_headers = FALSE
   )
   sink()
-
-  invisible(NULL)
 }
 
 

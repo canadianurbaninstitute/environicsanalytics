@@ -5,7 +5,6 @@
 \title{Create MobileScapes API "Dry" Request}
 \usage{
 test_query_mobilescapes(
-  bearer_token,
   start_datetime,
   end_datetime,
   geojson = NULL,
@@ -22,8 +21,6 @@ test_query_mobilescapes(
 )
 }
 \arguments{
-\item{bearer_token}{Character. OAuth bearer token.}
-
 \item{start_datetime}{Character. Start date/time in "YYYY-MM-DD hh:mm:ss" format.}
 
 \item{end_datetime}{Character. End date/time in "YYYY-MM-DD hh:mm:ss" format.}
@@ -49,6 +46,8 @@ test_query_mobilescapes(
 \item{report_type}{Character. Report type. Default is "celcdl".}
 
 \item{data_vintage}{Character. Optional. Data vintage.}
+
+\item{bearer_token}{Character. OAuth bearer token.}
 }
 \value{
 Invisibly returns NULL. Outputs dry run to "test_query.txt".
