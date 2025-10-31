@@ -115,6 +115,28 @@ Creates a dry run of an API request without submitting. Outputs the
 exact request that would be sent to "test_query.txt" for inspection and
 debugging.
 
+## API Notes
+
+The Environics Analytics MobileScapes API enforces **daily quotas** and **rate limits** to ensure fair and stable use of the service. All quotas reset at **05:00 AM UTC**.
+
+### Daily Quotas
+
+- **Call Volume Quota:**  
+  Up to **1,000 requests per user per day**, provided the geofence quota is not exceeded.
+
+- **Geofences Quota:**  
+  Up to **20,000 geofences per user per day**, distributed across multiple requests.  
+  Each request can include **up to 300 geofences**.
+
+**Best Practice:**  Spread requests evenly throughout the day. Sending large batches of geofences in rapid bursts will likely trigger automatic throttling, introducing delays denoted by "QUEUED" statuses on requests, or otherwise. The total daily geofence quota remains guaranteed even if throttling occurs.
+
+### Rate Limits
+
+Each API endpoint also enforces its own **rate limits** to maintain overall system stability.  
+If too many requests are made in a short time, the API may return a **`429 Too Many Requests`** error.  
+Response details for rate limit errors may vary by endpoint.
+
+
 ## Contact
 
 -   **Maintainer**: Luca Carnegie
