@@ -6,6 +6,9 @@ MobileScapes endpoint for querying location-based mobility data.
 ## Installation
 
 ``` r
+# Install Dependencies (if needed)
+install.packages(c("AzureStor","dplyr","geojsonio","httr2","jsonlite","readr","sf","dotenv"))
+
 # Install from GitHub
 devtools::install_github("canadianurbaninstitute/environicsanalytics")
 ```
