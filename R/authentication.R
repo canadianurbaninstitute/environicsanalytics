@@ -32,11 +32,11 @@ init_credentials <- function(
     token_url = "https://login.environicsanalytics.com/connect/token"
     ) {
 
-  # Validate credentials are provided
+  # Validate credentials are loaded
   if (client_id == "" || client_secret == "") {
     stop(
-      "ERROR: CLIENT_ID and CLIENT_SECRET must be provided as arguments ",
-      "or set in environment variables (CLIENT_ID, CLIENT_SECRET)"
+      "ERROR: CLIENT_ID CLIENT_SECRET, and SCOPE should be loaded as environment
+       variables, or provided as arguments to the function"
     )
   }
 
@@ -44,7 +44,6 @@ init_credentials <- function(
   cat("Verifying credentials...\n")
   tryCatch(
     {
-      suppressWarnings(dotenv::load_dot_env(".env"))
       token <- .get_bearer_token_internal(
         client_id = client_id,
         client_secret = client_secret,
