@@ -29,8 +29,12 @@ Initialize credentials at the start of your session:
 
 ``` r
 library(environicsanalytics)
+library(dotenv)
 
-# Initialize credentials (.env is loaded automatically)
+# Load environment variables
+dotenv::load_dot_env(".env")
+
+# Initialize credentials
 init_credentials()
 ```
 
