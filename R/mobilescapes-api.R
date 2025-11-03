@@ -210,7 +210,7 @@ process_geojson_file <- function(filepath,
 
   # Clean GeoJSON for API compliance
   if (!is.null(geojson)) {
-    body_list$geoJson <- .process_geojson_file(
+    body_list$geoJson <- process_geojson_file(
       geojson,
       5000000,
       1.05
