@@ -17,7 +17,8 @@ pull_mobilescapes(
   daily_time_filter = NULL,
   ping_filter = NULL,
   report_type = "celcdl",
-  data_vintage = NULL
+  data_vintage = NULL,
+  output_dir = "output"
 )
 }
 \arguments{
@@ -46,6 +47,8 @@ pull_mobilescapes(
 \item{report_type}{Character. Report type. Default is "celcdl".}
 
 \item{data_vintage}{Character. Optional. Data vintage.}
+
+\item{output_dir}{Character. Optional (default: "output"). Output directory.}
 }
 \value{
 Invisibly returns NULL. Creates output files in output directory.

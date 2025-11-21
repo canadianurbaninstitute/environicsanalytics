@@ -465,7 +465,6 @@ process_geojson_file <- function(filepath,
 #' Shows exactly what httr2 package will send to the Environics API
 #' without sending anything. Primarily for debugging.
 #'
-#' @param bearer_token Character. OAuth bearer token.
 #' @param start_datetime Character. Start date/time in "YYYY-MM-DD hh:mm:ss" format.
 #' @param end_datetime Character. End date/time in "YYYY-MM-DD hh:mm:ss" format.
 #' @param geojson List. GeoJSON object (will be cleaned automatically).
@@ -562,6 +561,7 @@ test_query_mobilescapes <- function(
 #' @param ping_filter Character. Optional. Ping filter ("first" or NULL).
 #' @param report_type Character. Report type. Default is "celcdl".
 #' @param data_vintage Character. Optional. Data vintage.
+#' @param output_dir Character. Optional (default: "output"). Output directory.
 #'
 #' @return Invisibly returns NULL. Creates output files in output directory.
 #'
@@ -579,7 +579,8 @@ pull_mobilescapes <- function(
     daily_time_filter = NULL,
     ping_filter = NULL,
     report_type = "celcdl",
-    data_vintage = NULL
+    data_vintage = NULL,
+    output_dir = "output"
 ) {
   cat("\n########################################\n")
 
@@ -729,8 +730,9 @@ pull_mobilescapes <- function(
   geojson_data <- jsonlite::fromJSON(readLines(geojson), simplifyVector = FALSE)
 
   # Basic output directory names
-  temp_dir <- "temp"
-  output_base_dir <- "output"
+  output_base_dir <- output_dir
+  temp_dir <- paste0(output_dir, "temp")
+
 
   # Construct detailed name for API call
   start_time_clean <- gsub("[: ]", "_", start_datetime)

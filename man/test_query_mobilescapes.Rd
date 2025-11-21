@@ -46,8 +46,6 @@ test_query_mobilescapes(
 \item{report_type}{Character. Report type. Default is "celcdl".}
 
 \item{data_vintage}{Character. Optional. Data vintage.}
-
-\item{bearer_token}{Character. OAuth bearer token.}
 }
 \value{
 Invisibly returns NULL. Outputs dry run to "test_query.txt".
