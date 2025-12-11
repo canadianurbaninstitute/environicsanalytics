@@ -563,7 +563,7 @@ test_query_mobilescapes <- function(
 #' @param data_vintage Character. Optional. Data vintage.
 #' @param output_dir Character. Optional (default: "output"). Output directory.
 #'
-#' @return Invisibly returns NULL. Creates output files in output directory.
+#' @return Creates output files in specified output directory. Returns directory of files as a character.
 #'
 #' @export
 pull_mobilescapes <- function(
@@ -580,7 +580,7 @@ pull_mobilescapes <- function(
     ping_filter = NULL,
     report_type = "celcdl",
     data_vintage = NULL,
-    output_dir = "output"
+    output_dir = "ea_output"
 ) {
   cat("\n########################################\n")
 
@@ -755,5 +755,5 @@ pull_mobilescapes <- function(
   cat("Output directory:", final_output_dir, "\n")
   cat("########################################\n")
 
-  invisible(NULL)
+  return(final_output_dir)
 }

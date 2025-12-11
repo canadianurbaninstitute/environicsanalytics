@@ -18,7 +18,7 @@ pull_mobilescapes(
   ping_filter = NULL,
   report_type = "celcdl",
   data_vintage = NULL,
-  output_dir = "output"
+  output_dir = "ea_output"
 )
 }
 \arguments{
@@ -51,7 +51,7 @@ pull_mobilescapes(
 \item{output_dir}{Character. Optional (default: "output"). Output directory.}
 }
 \value{
-Invisibly returns NULL. Creates output files in output directory.
+Creates output files in specified output directory. Returns directory of files as a character.
 }
 \description{
 Authenticates with API using bearer token, submits a request to the MobileScapes API,

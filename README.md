@@ -79,9 +79,9 @@ switching between accounts or testing.
 Main function for submitting and retrieving MobileScapes data. Accepts
 geography via GeoJSON file, geofence IDs, or WKT polygons. Handles
 request submission, polling, Azure download, and file consolidation.
-Returns CEL and CDL CSV files in the output directory.
+Returns CEL and CDL CSV files in the (specified) output directory.
 
-Parameters include: 
+Parameters: 
 - `start_datetime`, `end_datetime`: Time range in "YYYY-MM-DD hh:mm:ss" format
 - `geojson`: Path to GeoJSON file (features will be split if they exceed size limits)
 - `geofence_ids`: Vector of EA geofence IDs (alternative to GeoJSON)
@@ -94,8 +94,10 @@ Parameters include:
 - `ping_filter`: First ping filter ("first" or NULL)
 - `report_type`: Report type (default: "celcdl")
 - `data_vintage`: Specify data vintage
+- `output_dir`: Directory, relative to working directory, that files will be written to. (default: "ea_output")
 
-Review the [Environics API Documentation](https://developers.environicsanalytics.com/) to get more specifics on how the parameters work in detail.
+
+It is certainly worth 5-10 mins to review the [Environics API Documentation](https://developers.environicsanalytics.com/) to get more specifics on how each parameter works in detail.
 
 ### Debugging Functions
 
