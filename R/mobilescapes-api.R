@@ -455,6 +455,8 @@ process_geojson_file <- function(filepath,
 
 
   unlink(download_dir, recursive = TRUE)
+  rm(cel_data, cdl_data, combined_cel, combined_cdl)
+  gc()
   return(result_files)
 }
 
@@ -584,7 +586,7 @@ pull_mobilescapes <- function(
 ) {
   cat("\n########################################\n")
 
-  bearer_token <- get_bearer_token()
+  bearer_token <- .quietly_get_bearer_token
 
   body <- .make_request_body(
     start_datetime = start_datetime,
@@ -676,8 +678,41 @@ pull_mobilescapes <- function(
   cat("====================================\n")
 
 
-  # Perform request
-  resp <- httr2::req_perform(req)
+  # Perform request, being robust to 429 errors if query limit reached.
+  resp <- NULL
+  max_attempts <- 3
+  attempt <- 1
+
+  while (attempt <= max_attempts) {
+    tryCatch(
+      {
+        resp <- httr2::req_perform(req)
+        result <- httr2::resp_body_json(resp)
+
+        if (!is.null(result$requestId)) {
+          break  # Got a successful submission
+        }
+      },
+      error = function(e) {
+        if (grepl("429", e$message)) {
+          cat(sprintf("Attempt %d: Access Denied (429). Waiting until 12:05 AM tomorrow...\n", attempt))
+          current_time <- Sys.time()
+          target_time <- as.POSIXct(paste(as.Date(current_time) + 1, "00:05:00"))
+          Sys.sleep(as.numeric(difftime(target_time, current_time, units = "secs")))
+        } else {
+          stop("Error: ", e$message, "\n")
+        }
+      }
+    )
+    attempt <- attempt + 1
+  }
+
+  if (is.null(resp)) {
+    cat("ERROR: Failed to submit request after", max_attempts, "attempts.\n")
+    return(NULL)
+  }
+
+  # get initial response back
   result <- httr2::resp_body_json(resp)
 
   request_id <- result$requestId
@@ -688,7 +723,7 @@ pull_mobilescapes <- function(
     return(NULL)
   }
 
-  # Poll API to check if ready
+  # Poll API every 30s to check if data is ready
   cat("\n========================================\n")
   cat("Getting request status updates...\n")
   cat("========================================\n")
@@ -754,6 +789,11 @@ pull_mobilescapes <- function(
   cat("COMPLETED:", geography_name, "\n")
   cat("Output directory:", final_output_dir, "\n")
   cat("########################################\n")
+
+  # Clean up large in-memory objects before returning
+  rm(body, original_geojson, result, resp, downloaded_files,
+     request_id, bearer_token, geojson_data, req)
+  gc()
 
   return(final_output_dir)
 }
