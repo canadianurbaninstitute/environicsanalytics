@@ -6,7 +6,7 @@
 #' @return A cleaned GeoJSON list object
 #' @keywords internal
 .clean_geojson <- function(geography) {
-  cat("\nCleaning geography for API...\n")
+  cat("Cleaning geography for API...")
 
   # Handle sf objects - convert to GeoJSON list
   if (inherits(geography, "sf")) {
@@ -77,7 +77,7 @@
     clean_geojson$features[[length(clean_geojson$features) + 1]] <- clean_feature
   }
 
-  cat("Successfully cleaned", length(clean_geojson$features), "feature(s)\n")
+  cat(" ✓ Successfully cleaned all", length(clean_geojson$features), "feature(s)\n")
 
   # Validate output has features
   if (length(clean_geojson$features) == 0) {
@@ -115,13 +115,13 @@ process_geojson_file <- function(filepath,
   # Read GeoJSON file as sf object
   geography_sf <- sf::st_read(filepath, quiet = TRUE)
 
-  cat(sprintf("Loaded %d feature(s)\n", nrow(geography_sf)))
+  cat(sprintf("Found %d feature(s)\n", nrow(geography_sf)))
 
   # Check if splitting is needed
   cat("\n========================================\n")
   cat("Checking feature areas... ")
   needs_processing <- !.check_feature_area(geography_sf, max_area_sqft)
-  cat("========================================\n")
+
 
   if (needs_processing) {
     # Split large features
@@ -139,6 +139,8 @@ process_geojson_file <- function(filepath,
     jsonlite::write_json(clean_json, output_filepath, pretty = TRUE, auto_unbox = TRUE)
     cat("\u2713 File saved successfully\n")
   }
+
+  cat("========================================\n")
 
   invisible(clean_json)
 }
@@ -184,7 +186,7 @@ process_geojson_file <- function(filepath,
 
   # Validate that at least one polygon type is provided
   if (is.null(geofence_ids) && is.null(wkt_list) && is.null(geojson)) {
-    stop("Error: Must provide at least one of: geofence_ids, wkt_list, or geojson")
+    stop("Error: At least one of geofence_ids, wkt_list, or geojson must be provided as a parameter")
   }
 
   # Build basic request body
@@ -224,7 +226,7 @@ process_geojson_file <- function(filepath,
   if (!is.null(data_vintage)) body_list$dataVintage <- data_vintage
   if (!is.null(append_prizm_segmentation)) body_list$appendSegmentation <- append_prizm_segmentation
 
-  body_list
+  return(body_list)
 }
 
 #' Get MobileScapes Request Status
@@ -586,7 +588,7 @@ pull_mobilescapes <- function(
 ) {
   cat("\n########################################\n")
 
-  bearer_token <- .quietly_get_bearer_token
+  bearer_token <- .quietly_get_bearer_token()
 
   body <- .make_request_body(
     start_datetime = start_datetime,
@@ -619,7 +621,7 @@ pull_mobilescapes <- function(
       )
     })
 
-  cat("\nSubmitting API request...\n")
+  cat("\nSending API request...\n")
 
   # Print summary of submission
   cat("\n========= Request Summary ==========\n")
@@ -695,7 +697,7 @@ pull_mobilescapes <- function(
       },
       error = function(e) {
         if (grepl("429", e$message)) {
-          cat(sprintf("Attempt %d: Access Denied (429). Waiting until 12:05 AM tomorrow...\n", attempt))
+          cat(sprintf("Access Denied (429). Attempt %d: Sleeping until 12:05 AM tomorrow...\n", attempt))
           current_time <- Sys.time()
           target_time <- as.POSIXct(paste(as.Date(current_time) + 1, "00:05:00"))
           Sys.sleep(as.numeric(difftime(target_time, current_time, units = "secs")))
@@ -708,7 +710,7 @@ pull_mobilescapes <- function(
   }
 
   if (is.null(resp)) {
-    cat("ERROR: Failed to submit request after", max_attempts, "attempts.\n")
+    cat("ERROR: Failed to submit request after", max_attempts, "attempts. Stopping... \n")
     return(NULL)
   }
 
@@ -725,7 +727,7 @@ pull_mobilescapes <- function(
 
   # Poll API every 30s to check if data is ready
   cat("\n========================================\n")
-  cat("Getting request status updates...\n")
+  cat("Getting request updates...\n")
   cat("========================================\n")
 
   repeat {
@@ -733,7 +735,7 @@ pull_mobilescapes <- function(
     request_status <- .get_request_status(bearer_token, request_id)
 
     if (is.null(request_status)) {
-      cat("Error: Failed to get request status. Aborting.\n")
+      cat("Error: Failed to get request status. Aborting pull.\n")
       return(NULL)
     }
 
@@ -755,7 +757,7 @@ pull_mobilescapes <- function(
       cat("========================================\n")
       return(NULL)
     } else {
-      cat("Request status:", current_status, "(waiting 30s)\n")
+      cat("Status:", current_status, "(Next update in 30s)\n")
       Sys.sleep(30)
     }
 
@@ -790,7 +792,7 @@ pull_mobilescapes <- function(
   cat("Output directory:", final_output_dir, "\n")
   cat("########################################\n")
 
-  # Clean up large in-memory objects before returning
+  # Clean up large in-memory objects before returning directory
   rm(body, original_geojson, result, resp, downloaded_files,
      request_id, bearer_token, geojson_data, req)
   gc()
