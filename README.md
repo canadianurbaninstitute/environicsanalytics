@@ -46,6 +46,7 @@ pull_mobilescapes(
   start_datetime = "2024-01-01 00:00:00",
   end_datetime = "2024-01-31 23:59:59",
   geojson = "path/to/your/geography.geojson",
+  # geofence_ids = list(n1, n2, n3, ...),
   use_weights = TRUE,
   aggregate_polygons = TRUE
 )
