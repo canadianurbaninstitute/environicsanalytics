@@ -100,6 +100,41 @@ Parameters:
 
 It is certainly worth 5-10 mins to review the [Environics API Documentation](https://developers.environicsanalytics.com/) to get more specifics on how each parameter works in detail.
 
+**`pull_extract()`** *(experimental — new Data Extract endpoint)*\
+Submits and retrieves data from the overhauled MobileScapes Data
+Extract endpoint. The new endpoint accepts **EA geofence IDs only** (no
+GeoJSON/WKT), uses date-only time ranges, and flattens time filtering
+into `days_of_week` / `time_of_day`. The endpoint is not yet live, so
+this function is written against a sample specification and is untested
+against the real service.
+
+``` r
+pull_extract(
+  geofence_ids = c("E12345", "E12346"),
+  start_date = "2026-01-01",
+  end_date = "2026-01-31",
+  days_of_week = c("Mon", "Tue", "Wed", "Thu", "Fri"),
+  time_of_day = "AllDay",
+  dwell = "Any",
+  target_set = list(
+    list(targetGroupId = "group_1", segmentCodes = c("01", "02", "03"))
+  ),
+  country_code = "ca",
+  vintage = "2026"
+)
+```
+
+Parameters:
+- `geofence_ids`: Vector of EA geofence IDs (required; max 300 per request)
+- `start_date`, `end_date`: Date range in "YYYY-MM-DD" format
+- `days_of_week`: Days to include, 3-letter capitalized names (e.g. `c("Mon", "Tue")`)
+- `time_of_day`: Time-of-day filter (e.g. `"AllDay"`)
+- `dwell`: Dwell filter (e.g. `"Any"`)
+- `target_set`: List of target groups, each with `targetGroupId` and `segmentCodes`
+- `country_code`: 2-digit country code (default `"ca"`)
+- `vintage`: Data vintage (part of the new API's URL path)
+- `output_dir`: Output directory (default `"ea_output"`)
+
 ### Debugging Functions
 
 **`process_geojson_file()`**\
@@ -120,6 +155,12 @@ result <- process_geojson_file(
 Creates a dry run of an API request without submitting. Outputs the
 exact request that would be sent to "test_query.txt" for inspection and
 debugging.
+
+**`test_query_extract()`**\
+Same idea for the new Data Extract endpoint: builds and validates the
+request without sending it, writing the dry run to
+"test_extract_query.txt". This is the main verification tool until the
+new endpoint goes live.
 
 ## API Notes
 
