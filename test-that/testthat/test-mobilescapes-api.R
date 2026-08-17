@@ -3,30 +3,36 @@ test_that("credentials initialize properly", {
   init_credentials()
 })
 
-test_that("you can pull a geography under 5M sqft", {
+test_that("you can discover geofences and pull an origins extract", {
   dotenv::load_dot_env(testthat::test_path("mobilescapes-test-data", ".env"))
   init_credentials()
-  geojson <- "tests/testthat/mobilescapes-test-data/oshawa_bia.geojson"
-  dt <- c("2025-01-01 00:00:00", "2025-01-01 00:30:00")
+
+  # NOTE: replace with a real vintage and a filter matching your BIAs.
+  vintage <- "2026"
+
+  geofences <- discover_mobilescapes_geofences(
+    filter_definition = "PRCDCSD_NAME IN ('Oshawa, ON (CY)')",
+    page_size = 25,
+    vintage = vintage
+  )
+
   pull_mobilescapes(
-    start_datetime = dt[1],
-    end_datetime = dt[2],
-    geojson = geojson,
-    aggregate_polygons = FALSE,
-    append_prizm_segmentation = "prizm"
+    geofence_ids = geofences$geofenceId,
+    start_date = "2025-01-01",
+    end_date = "2025-01-31",
+    vintage = vintage
   )
 })
 
-test_that("you can pull a geography over 5M sqft", {
+test_that("you can request an origins report", {
   dotenv::load_dot_env(testthat::test_path("mobilescapes-test-data", ".env"))
   init_credentials()
-  geojson <- "tests/testthat/mobilescapes-test-data/downtown_moncton_bia.geojson"
-  dt <- c("2025-01-01 00:00:00", "2025-01-01 00:30:00")
-  pull_mobilescapes(
-    start_datetime = dt[1],
-    end_datetime = dt[2],
-    geojson = geojson,
-    aggregate_polygons = FALSE,
-    append_prizm_segmentation = "prizm"
+
+  get_mobilescapes_origins(
+    geofence_ids = c("E12345", "E12346"),
+    start_date = "2025-01-01",
+    end_date = "2025-01-31",
+    geo_level_code = "FSA",
+    vintage = "2026"
   )
 })

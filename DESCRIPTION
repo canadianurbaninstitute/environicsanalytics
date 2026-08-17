@@ -13,14 +13,11 @@ Description: environicsanalytics provides R with functionality to retrieve data 
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-Imports: 
+Imports:
     AzureStor,
     dplyr,
-    geojsonio,
     httr2,
-    jsonlite,
-    readr,
-    sf
+    readr
 RoxygenNote: 7.3.3
 URL: https://github.com/canadianurbaninstitute/environicsanalytics
 BugReports: https://github.com/canadianurbaninstitute/environicsanalytics/issues

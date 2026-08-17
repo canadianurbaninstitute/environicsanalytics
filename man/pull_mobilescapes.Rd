@@ -2,59 +2,49 @@
 % Please edit documentation in R/mobilescapes-api.R
 \name{pull_mobilescapes}
 \alias{pull_mobilescapes}
-\title{Submit and Pull MobileScapes API Request}
+\title{Submit and Pull MobileScapes Origins Extract}
 \usage{
 pull_mobilescapes(
-  start_datetime,
-  end_datetime,
-  geojson = NULL,
-  geofence_ids = NULL,
-  wkt_list = NULL,
-  use_weights = TRUE,
-  aggregate_polygons = TRUE,
-  aggregate_polygon_name = NULL,
-  append_prizm_segmentation = "prizm",
-  daily_time_filter = NULL,
-  ping_filter = NULL,
-  report_type = "celcdl",
-  data_vintage = NULL,
+  geofence_ids,
+  start_date,
+  end_date,
+  days_of_week = NULL,
+  time_of_day = "AllDay",
+  dwell = "Any",
+  country = "ca",
+  vintage,
+  output_name = NULL,
   output_dir = "ea_output"
 )
 }
 \arguments{
-\item{start_datetime}{Character. Start date/time in "YYYY-MM-DD hh:mm:ss" format.}
+\item{geofence_ids}{Character vector. EA geofence IDs (see
+[discover_mobilescapes_geofences()]).}
 
-\item{end_datetime}{Character. End date/time in "YYYY-MM-DD hh:mm:ss" format.}
+\item{start_date}{Character. Start date in "YYYY-MM-DD" format.}
 
-\item{geojson}{Character. Path to GeoJSON file.}
+\item{end_date}{Character. End date in "YYYY-MM-DD" format.}
 
-\item{geofence_ids}{Vector. Optional. EA geofence IDs.}
+\item{days_of_week}{Character vector. Optional. e.g. c("Mon", "Tue").}
 
-\item{wkt_list}{List. Optional. Well-Known Text polygon definitions.}
+\item{time_of_day}{Character. Optional. Default "AllDay".}
 
-\item{use_weights}{Logical. Apply weights per device. Default is TRUE.}
+\item{dwell}{Character. Optional. Default "Any".}
 
-\item{aggregate_polygons}{Logical. Aggregate results across polygons. Default is TRUE.}
+\item{country}{Character. 2-digit country code. Default "ca".}
 
-\item{aggregate_polygon_name}{Character. Optional. Name for aggregated results.}
+\item{vintage}{Character or numeric. Dataset vintage (e.g. "2026").}
 
-\item{append_prizm_segmentation}{Character. Optional. PRIZM segmentation.}
+\item{output_name}{Character. Optional. Base name for the output CSV file.
+Defaults to a name derived from the date range.}
 
-\item{daily_time_filter}{List. Optional. Filter for specific times/days.}
-
-\item{ping_filter}{Character. Optional. Ping filter ("first" or NULL).}
-
-\item{report_type}{Character. Report type. Default is "celcdl".}
-
-\item{data_vintage}{Character. Optional. Data vintage.}
-
-\item{output_dir}{Character. Optional (default: "output"). Output directory.}
+\item{output_dir}{Character. Optional (default: "ea_output"). Output directory.}
 }
 \value{
 Creates output files in specified output directory. Returns directory of files as a character.
 }
 \description{
-Authenticates with API using bearer token, submits a request to the MobileScapes API,
-handles GeoJSON splitting if needed, polls for completion, downloads data from Azure,
-and merges chunks into consolidated CEL and CDL CSV files.
+Authenticates with the API using a bearer token, submits an Origins
+Extract request, polls for completion, downloads the CSV chunks from
+Azure, and merges them into a single consolidated CSV file.
 }
