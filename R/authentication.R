@@ -3,6 +3,13 @@
 # Create a private package environment to store credentials and tokens
 .pkg_env <- new.env(parent = emptyenv())
 
+# MobileScapes v5 authenticates against Microsoft Entra (Azure AD), not the
+# legacy Environics IdentityServer used by v4. The v4 endpoint
+# ("https://login.environicsanalytics.com/connect/token") now returns
+# {"error":"invalid_client"} for v5 credentials.
+.EA_DEFAULT_TOKEN_URL <- "https://login.microsoftonline.com/eaplatform.onmicrosoft.com/oauth2/v2.0/token"
+.EA_DEFAULT_SCOPE <- "https://eaplatform.onmicrosoft.com/api/.default"
+
 
 #' Initialize Package Credentials
 #'
@@ -11,8 +18,11 @@
 #'
 #' @param client_id Character. OAuth client ID
 #' @param client_secret Character. OAuth client secret
-#' @param scope Character. OAuth scope (default: "mobilescapes")
-#' @param token_url Character. Token endpoint URL
+#' @param scope Character. OAuth scope. As of MobileScapes v5 this is a
+#'   Microsoft Entra scope, e.g. "https://eaplatform.onmicrosoft.com/api/.default".
+#' @param token_url Character. Token endpoint URL. As of v5 this is the
+#'   Microsoft Entra endpoint; the legacy IdentityServer endpoint
+#'   (login.environicsanalytics.com/connect/token) returns "invalid_client".
 #'
 #' @return Invisibly TRUE if credentials are valid, stops with error otherwise
 #'
@@ -28,10 +38,8 @@
 init_credentials <- function(
     client_id = Sys.getenv("CLIENT_ID"),
     client_secret = Sys.getenv("CLIENT_SECRET"),
-    scope = Sys.getenv("SCOPE", "mobilescapes"),
-    token_url = "https://login.environicsanalytics.com/connect/token"
-    ) {
-
+    scope = Sys.getenv("SCOPE", .EA_DEFAULT_SCOPE),
+    token_url = Sys.getenv("TOKEN_URL", .EA_DEFAULT_TOKEN_URL)) {
   # Validate credentials are loaded
   if (client_id == "" || client_secret == "") {
     stop(
@@ -58,7 +66,7 @@ init_credentials <- function(
       .pkg_env$token_url <- token_url
       .pkg_env$token <- token
       .pkg_env$token_obtained_at <- Sys.time()
-      .pkg_env$token_expires_in <- NULL  # Will be set by get_bearer_token
+      .pkg_env$token_expires_in <- NULL # Will be set by get_bearer_token
 
       cat("Credentials verified and initialized successfully!\n")
       invisible(TRUE)
@@ -116,6 +124,33 @@ init_credentials <- function(
 #'
 #' @keywords internal
 .get_bearer_token_internal <- function(client_id, client_secret, scope, token_url) {
+  # Fail before making a network call, not after. Both checks exist because
+  # this exact confusion happened in practice: a new v5 client secret posted
+  # to the old v4 endpoint returns {"error":"invalid_client"}, which reads
+  # like a bad credential rather than a dead endpoint.
+  if (grepl("login.environicsanalytics.com", token_url, fixed = TRUE)) {
+    stop(
+      "token_url ('", token_url, "') is the legacy MobileScapes v4 ",
+      "IdentityServer endpoint. It does not accept v5 credentials and will ",
+      "return {\"error\":\"invalid_client\"} regardless of whether client_id/",
+      "client_secret are correct. As of v5, authentication is via Microsoft ",
+      "Entra - remove any hardcoded token_url (or SCOPE/TOKEN_URL env vars ",
+      "left over from a v4 .env file) so init_credentials() falls back to ",
+      "its v5 default: ", .EA_DEFAULT_TOKEN_URL,
+      call. = FALSE
+    )
+  }
+
+  if (identical(scope, "mobilescapes")) {
+    stop(
+      "scope = 'mobilescapes' is the legacy MobileScapes v4 OAuth scope. ",
+      "v5 authenticates via Microsoft Entra and expects a resource scope ",
+      "instead - remove any SCOPE=mobilescapes left over from a v4 .env ",
+      "file so init_credentials() falls back to its v5 default: ",
+      .EA_DEFAULT_SCOPE,
+      call. = FALSE
+    )
+  }
 
   req <- httr2::request(token_url) |>
     httr2::req_body_form(
@@ -137,19 +172,12 @@ init_credentials <- function(
 #' Get Valid Bearer Token Quietly
 #'
 #' Returns a valid bearer token, refreshing if necessary, without verbosity.
+#' Used internally by [.build_request()] - unlike [get_bearer_token()], this
+#' does not print progress messages.
 #'
 #' @return Character. Valid bearer token string
 #'
-#' @examples
-#' \dontrun{
-#' init_credentials(
-#'   client_id = Sys.getenv("CLIENT_ID"),
-#'   client_secret = Sys.getenv("CLIENT_SECRET")
-#' )
-#' token <- get_bearer_token()
-#' }
-#'
-#' @export
+#' @keywords internal
 .quietly_get_bearer_token <- function() {
   creds <- .get_credentials()
 

@@ -1,10 +1,10 @@
 test_that("credentials initialize properly", {
-  dotenv::load_dot_env(testthat::test_path("mobilescapes-test-data", ".env"))
+  readRenviron(testthat::test_path("mobilescapes-test-data", ".env"))
   init_credentials()
 })
 
 test_that("you can discover geofences and pull an origins extract", {
-  dotenv::load_dot_env(testthat::test_path("mobilescapes-test-data", ".env"))
+  readRenviron(testthat::test_path("mobilescapes-test-data", ".env"))
   init_credentials()
 
   # NOTE: replace with a real vintage and a filter matching your BIAs.
@@ -25,7 +25,7 @@ test_that("you can discover geofences and pull an origins extract", {
 })
 
 test_that("you can request an origins report", {
-  dotenv::load_dot_env(testthat::test_path("mobilescapes-test-data", ".env"))
+  readRenviron(testthat::test_path("mobilescapes-test-data", ".env"))
   init_credentials()
 
   get_mobilescapes_origins(

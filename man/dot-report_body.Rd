@@ -22,15 +22,21 @@
 
 \item{end_date}{Character. End date in "YYYY-MM-DD" format.}
 
-\item{days_of_week}{Character vector. Optional. e.g. c("Sat", "Sun").}
+\item{days_of_week}{Character vector. Optional. "Mon" through "Sun".}
 
-\item{time_of_day}{Character. Optional. e.g. "AllDay".}
+\item{time_of_day}{Character. Optional. One of "AllDay", "Morning",
+"Afternoon", "Evening" (verified against the API; hour boundaries are
+undocumented). This is a filter, not a breakdown - each bucket needs its
+own request, and the three named buckets cover ~99% of "AllDay", leaving
+an overnight residual with no selectable bucket.}
 
-\item{dwell}{Character. Optional. e.g. "Any".}
+\item{dwell}{Character. Optional. One of "Any", "Short", "Medium", "Long"
+(verified against the API; minute thresholds are undocumented).}
 
 \item{target_set}{List. Optional. List of `list(targetGroupId = ..., segmentCodes = ...)`.}
 
-\item{geo_level_code}{Character. Optional. Geographic level for aggregation (e.g. "FSA").}
+\item{geo_level_code}{Character. Optional. Geographic level for aggregation.
+One of "PRCDDA", "PRCDADA", "FSA", "PRCDCSD", "PRCD", "CMACA", "PR".}
 }
 \value{
 List. Request body.

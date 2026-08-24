@@ -12,7 +12,8 @@ test_query_mobilescapes(
   time_of_day = "AllDay",
   dwell = "Any",
   country = "ca",
-  vintage
+  vintage,
+  ...
 )
 }
 \arguments{
@@ -22,15 +23,21 @@ test_query_mobilescapes(
 
 \item{end_date}{Character. End date in "YYYY-MM-DD" format.}
 
-\item{days_of_week}{Character vector. Optional. e.g. c("Mon", "Tue").}
+\item{days_of_week}{Character vector. Optional. "Mon" through "Sun".}
 
-\item{time_of_day}{Character. Optional. Default "AllDay".}
+\item{time_of_day}{Character. Optional. One of "AllDay", "Morning",
+"Afternoon", "Evening". Default "AllDay".}
 
-\item{dwell}{Character. Optional. Default "Any".}
+\item{dwell}{Character. Optional. One of "Any", "Short", "Medium",
+"Long". Default "Any".}
 
 \item{country}{Character. 2-digit country code. Default "ca".}
 
 \item{vintage}{Character or numeric. Dataset vintage (e.g. "2026").}
+
+\item{...}{Not used. Present only so that passing a removed v4 argument
+(e.g. `geojson`, `use_weights`, `daily_time_filter`) fails immediately
+with a migration hint instead of a generic "unused argument" error.}
 }
 \value{
 Invisibly returns NULL. Outputs dry run to "test_mobilescapes_query.txt".

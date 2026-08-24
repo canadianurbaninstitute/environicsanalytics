@@ -34,6 +34,13 @@
 
   req <- httr2::request(url) |>
     httr2::req_auth_bearer_token(bearer_token) |>
+    # v5 rate-limits aggressively and returns a bare {"status":429} with no
+    # Retry-After header, so back off exponentially on our own.
+    httr2::req_retry(
+      max_tries = 5,
+      is_transient = function(resp) httr2::resp_status(resp) %in% c(429, 503),
+      backoff = function(attempt) min(60, 2^attempt)
+    ) |>
     httr2::req_error(body = function(resp) {
       error_content <- tryCatch(httr2::resp_body_json(resp), error = function(e) NULL)
       paste0(
@@ -73,11 +80,17 @@
 #' @param geofence_ids Character vector. EA geofence IDs.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
-#' @param days_of_week Character vector. Optional. e.g. c("Sat", "Sun").
-#' @param time_of_day Character. Optional. e.g. "AllDay".
-#' @param dwell Character. Optional. e.g. "Any".
+#' @param days_of_week Character vector. Optional. "Mon" through "Sun".
+#' @param time_of_day Character. Optional. One of "AllDay", "Morning",
+#'   "Afternoon", "Evening" (verified against the API; hour boundaries are
+#'   undocumented). This is a filter, not a breakdown - each bucket needs its
+#'   own request, and the three named buckets cover ~99% of "AllDay", leaving
+#'   an overnight residual with no selectable bucket.
+#' @param dwell Character. Optional. One of "Any", "Short", "Medium", "Long"
+#'   (verified against the API; minute thresholds are undocumented).
 #' @param target_set List. Optional. List of `list(targetGroupId = ..., segmentCodes = ...)`.
-#' @param geo_level_code Character. Optional. Geographic level for aggregation (e.g. "FSA").
+#' @param geo_level_code Character. Optional. Geographic level for aggregation.
+#'   One of "PRCDDA", "PRCDADA", "FSA", "PRCDCSD", "PRCD", "CMACA", "PR".
 #'
 #' @return List. Request body.
 #' @keywords internal
@@ -95,19 +108,73 @@
     stop("Error: geofence_ids must be provided (a character vector of EA geofence IDs)")
   }
 
+  # as.list() keeps these as JSON arrays. httr2 serialises with
+  # auto_unbox = TRUE, so a length-1 vector would otherwise become a bare
+  # string and the API rejects it ("must be an array of JSON strings").
   body <- list(
-    geofenceIds = geofence_ids,
+    geofenceIds = as.list(as.character(geofence_ids)),
     startDate = start_date,
     endDate = end_date
   )
 
   if (!is.null(geo_level_code)) body$geoLevelCode <- geo_level_code
-  if (!is.null(days_of_week)) body$daysOfWeek <- days_of_week
+  if (!is.null(days_of_week)) body$daysOfWeek <- as.list(as.character(days_of_week))
   if (!is.null(time_of_day)) body$timeOfDay <- time_of_day
   if (!is.null(dwell)) body$dwell <- dwell
   if (!is.null(target_set)) body$targetSet <- target_set
 
   body
+}
+
+#' Reject Legacy v4 Arguments
+#'
+#' `pull_mobilescapes()` and `test_query_mobilescapes()` kept their v4 names
+#' across the v5 rewrite even though every parameter except `geofence_ids`
+#' changed shape or was removed outright. Without this, passing old-style
+#' arguments (e.g. `geojson = ...`) would only surface R's generic "unused
+#' argument" error - this gives a specific, per-argument migration hint
+#' instead, and does it before any network call is made.
+#'
+#' @param dots The caller's `...`, as `list(...)`.
+#' @param fn_name Character. Name of the calling function, for the message.
+#'
+#' @keywords internal
+.reject_legacy_args <- function(dots, fn_name) {
+  if (length(dots) == 0) return(invisible(NULL))
+
+  hints <- list(
+    start_datetime = "removed - use `start_date` (\"YYYY-MM-DD\", no time component)",
+    end_datetime   = "removed - use `end_date` (\"YYYY-MM-DD\", no time component)",
+    geojson        = "removed - MobileScapes v5 only accepts EA Geofence Library IDs; resolve them with discover_mobilescapes_geofences() and pass `geofence_ids`",
+    wkt_list       = "removed - MobileScapes v5 only accepts EA Geofence Library IDs; resolve them with discover_mobilescapes_geofences() and pass `geofence_ids`",
+    use_weights    = "removed - v5 always applies calibrated weighting",
+    aggregate_polygons = "removed - v5's origins report always pools across all `geofence_ids`; destinations and the extract never pool",
+    aggregate_polygon_name = "removed - use `output_name` instead",
+    append_prizm_segmentation = "removed - no v5 report or extract returns a PRIZM segment",
+    daily_time_filter = "removed - use `days_of_week` and `time_of_day` (\"AllDay\"/\"Morning\"/\"Afternoon\"/\"Evening\" only - coarser than v4's day-parts)",
+    ping_filter    = "removed - `dwell` (\"Any\"/\"Short\"/\"Medium\"/\"Long\") is a different, new filter (visit duration), not a replacement",
+    report_type    = "removed - the v5 extract only produces Origins data; \"celcdl\"/\"geofencepings\" have no v5 equivalent",
+    data_vintage   = "renamed to `vintage`, and now selects the API dataset itself rather than an appended output column"
+  )
+
+  offending <- intersect(names(dots), names(hints))
+  if (length(offending) > 0) {
+    stop(
+      sprintf(
+        "%s(): the following argument(s) are from the MobileScapes v4 API and no longer exist:\n%s",
+        fn_name,
+        paste(sprintf("  - `%s`: %s", offending, unlist(hints[offending])), collapse = "\n")
+      ),
+      call. = FALSE
+    )
+  }
+
+  unknown <- setdiff(names(dots), names(hints))
+  if (length(unknown) > 0) {
+    stop(sprintf("%s(): unused argument(s): %s", fn_name, paste(unknown, collapse = ", ")), call. = FALSE)
+  }
+
+  invisible(NULL)
 }
 
 # Config & Geofence Discovery ###################################################
@@ -138,12 +205,18 @@ get_mobilescapes_config <- function(country = "ca", vintage) {
 #'
 #' @param filter_definition Character. Optional. Filter expression, e.g.
 #'   `"PRCDCSD_NAME IN ('Toronto, ON (C)') AND PR_NAME IN ('Ontario')"`.
-#' @param page Numeric. Page number. Default 1.
-#' @param page_size Numeric. Results per page. Default 25.
+#' @param page Numeric. Page number to start from. Default 1.
+#' @param page_size Numeric. Results per page. Default 100. The API does not
+#'   document a maximum; if a large value errors, lower it.
 #' @param sort_by Character. One of GEOFENCE_ID, GEOFENCE_NAME, PRCDCSD_NAME,
 #'   CMACA_NAME, PR_NAME, BANNER, PARENT_COMPANY, CATEGORY, SUB_CATEGORY,
 #'   GEOFENCE_TYPE, IS_PRIMARY_POLYGON, GEOFENCE_SQUARE_FOOTAGE. Default "GEOFENCE_ID".
 #' @param sort_direction Character. "asc" or "desc". Default "asc".
+#' @param all_pages Logical. If TRUE (default) keep requesting successive
+#'   pages until the API returns a short page, so the full matching set is
+#'   returned. If FALSE, return only the single page given by `page`.
+#' @param max_pages Numeric. Safety cap on the number of pages fetched when
+#'   `all_pages = TRUE`. Default 100. A warning is issued if it is hit.
 #' @param country Character. 2-digit country code. Default "ca".
 #' @param vintage Character or numeric. Dataset vintage (e.g. "2026").
 #'
@@ -153,25 +226,65 @@ get_mobilescapes_config <- function(country = "ca", vintage) {
 discover_mobilescapes_geofences <- function(
     filter_definition = NULL,
     page = 1,
-    page_size = 25,
+    page_size = 100,
     sort_by = "GEOFENCE_ID",
     sort_direction = "asc",
+    all_pages = TRUE,
+    max_pages = 100,
     country = "ca",
     vintage
 ) {
-  query <- list(
-    Page = page,
-    PageSize = page_size,
-    SortBy = sort_by,
-    SortDirection = sort_direction
-  )
-  if (!is.null(filter_definition)) query$FilterDefinition <- filter_definition
-
   url <- .mobilescapes_url(country, vintage, "geofences")
-  req <- .build_request(url, query = query)
-  result <- .perform_request(req)
 
-  dplyr::bind_rows(result$items)
+  fetch_page <- function(page_number) {
+    query <- list(
+      Page = page_number,
+      PageSize = page_size,
+      SortBy = sort_by,
+      SortDirection = sort_direction
+    )
+    if (!is.null(filter_definition)) query$FilterDefinition <- filter_definition
+
+    .perform_request(.build_request(url, query = query))
+  }
+
+  if (!all_pages) {
+    return(dplyr::bind_rows(fetch_page(page)$items))
+  }
+
+  # The API reports `page`/`pageSize` but no total count, so page until a
+  # short (or empty) page comes back. Without this the caller silently gets
+  # only the first page_size geofences for the filter.
+  collected <- list()
+  pages_fetched <- 0
+
+  repeat {
+    result <- fetch_page(page + pages_fetched)
+    items <- result$items
+    pages_fetched <- pages_fetched + 1
+
+    if (length(items) > 0) {
+      collected[[length(collected) + 1]] <- dplyr::bind_rows(items)
+    }
+
+    if (length(items) < page_size) break
+
+    if (pages_fetched >= max_pages) {
+      warning(
+        "discover_mobilescapes_geofences(): stopped at max_pages = ", max_pages,
+        " (", sum(vapply(collected, nrow, integer(1))), " geofences). ",
+        "Results may be truncated - raise max_pages or narrow filter_definition.",
+        call. = FALSE
+      )
+      break
+    }
+  }
+
+  if (length(collected) == 0) {
+    return(data.frame(geofenceId = character(0), geofenceName = character(0)))
+  }
+
+  dplyr::bind_rows(collected)
 }
 
 # Synchronous Report Endpoints ###################################################
@@ -182,13 +295,33 @@ discover_mobilescapes_geofences <- function(
 #' from to visit the selected geofence(s), grouped by the requested
 #' geographic level.
 #'
+#' Note: results are pooled across all `geofence_ids` in the request - the
+#' response carries no per-geofence breakdown. For a per-area origin profile,
+#' call this once per area.
+#'
 #' @param geofence_ids Character vector. EA geofence IDs.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
-#' @param geo_level_code Character. Geographic level to group origins by (e.g. "FSA").
+#' @param geo_level_code Character. Required. Geographic level to group origins
+#'   by. Allowed values, finest to coarsest (verified against the v5 API):
+#'   \itemize{
+#'     \item `"PRCDDA"`   - Dissemination Area (finest available)
+#'     \item `"PRCDADA"`  - Aggregate Dissemination Area
+#'     \item `"FSA"`      - Forward Sortation Area (first 3 postal characters)
+#'     \item `"PRCDCSD"`  - Census Subdivision (municipality)
+#'     \item `"PRCD"`     - Census Division
+#'     \item `"CMACA"`    - Census Metropolitan Area / Census Agglomeration
+#'     \item `"PR"`       - Province
+#'   }
+#'   This report returns aggregated counts only, one level per request. For
+#'   coordinates, postal code, census tract, or a per-geofence breakout, use
+#'   the CSV extract via `pull_mobilescapes()` instead - it still carries
+#'   `LATITUDE`/`LONGITUDE` and the full geography hierarchy.
 #' @param days_of_week Character vector. Optional. e.g. c("Sat", "Sun").
-#' @param time_of_day Character. Optional. Default "AllDay".
-#' @param dwell Character. Optional. Default "Any".
+#' @param time_of_day Character. Optional. One of "AllDay", "Morning",
+#'   "Afternoon", "Evening". Default "AllDay".
+#' @param dwell Character. Optional. One of "Any", "Short", "Medium",
+#'   "Long". Default "Any".
 #' @param target_set List. Optional. List of `list(targetGroupId = ..., segmentCodes = ...)`.
 #' @param country Character. 2-digit country code. Default "ca".
 #' @param vintage Character or numeric. Dataset vintage (e.g. "2026").
@@ -229,9 +362,11 @@ get_mobilescapes_origins <- function(
 #' @param geofence_ids Character vector. EA geofence IDs.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
-#' @param days_of_week Character vector. Optional. e.g. c("Mon", "Tue").
-#' @param time_of_day Character. Optional. Default "AllDay".
-#' @param dwell Character. Optional. Default "Any".
+#' @param days_of_week Character vector. Optional. "Mon" through "Sun".
+#' @param time_of_day Character. Optional. One of "AllDay", "Morning",
+#'   "Afternoon", "Evening". Default "AllDay".
+#' @param dwell Character. Optional. One of "Any", "Short", "Medium",
+#'   "Long". Default "Any".
 #' @param target_set List. Optional. List of `list(targetGroupId = ..., segmentCodes = ...)`.
 #' @param country Character. 2-digit country code. Default "ca".
 #' @param vintage Character or numeric. Dataset vintage (e.g. "2026").
@@ -273,9 +408,11 @@ get_mobilescapes_destinations <- function(
 #' @param geofence_ids Character vector. EA geofence IDs.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
-#' @param days_of_week Character vector. Optional. e.g. c("Mon", "Tue").
-#' @param time_of_day Character. Optional. Default "AllDay".
-#' @param dwell Character. Optional. Default "Any".
+#' @param days_of_week Character vector. Optional. "Mon" through "Sun".
+#' @param time_of_day Character. Optional. One of "AllDay", "Morning",
+#'   "Afternoon", "Evening". Default "AllDay".
+#' @param dwell Character. Optional. One of "Any", "Short", "Medium",
+#'   "Long". Default "Any".
 #' @param country Character. 2-digit country code. Default "ca".
 #' @param vintage Character or numeric. Dataset vintage (e.g. "2026").
 #'
@@ -384,7 +521,14 @@ get_mobilescapes_related_visits <- function(
   .perform_request(req)
 }
 
-#' Download MobileScapes Extract Files from Azure Blob Storage
+#' Download MobileScapes Extract Files
+#'
+#' v5 serves extract output from a custom CDN host
+#' (`https://cdn.environicsanalytics.com`) with the container nested under a
+#' path prefix, rather than from `<account>.blob.core.windows.net`. AzureStor
+#' infers the storage service from the hostname and rejects that URL with
+#' "Unknown endpoint service", so the container is read directly over HTTP
+#' using the pre-signed `blobList` URL the API returns.
 #'
 #' @keywords internal
 .download_extract_files <- function(request_id, country, vintage, output_dir = "temp") {
@@ -404,35 +548,42 @@ get_mobilescapes_related_visits <- function(
     cat("Created output directory:", output_dir, "\n")
   }
 
-  cat("Connecting to Azure Blob Storage...\n")
-
-  endpoint <- AzureStor::storage_endpoint(result_info$storageUrl, sas = result_info$sasToken)
-  container <- AzureStor::storage_container(endpoint, result_info$containerName)
+  # The container's real base URL is only discoverable from blobList - it
+  # carries the path prefix that storageUrl and containerName omit.
+  container_base <- sub("\\?.*$", "", result_info$blobList)
 
   cat("Listing available files...\n")
-  blob_list <- AzureStor::list_blobs(container)
+  blob_names <- .list_extract_blobs(result_info$blobList)
 
-  if (nrow(blob_list) == 0) {
+  if (length(blob_names) == 0) {
     cat("WARNING: No files found in container\n")
     return(NULL)
   }
 
-  cat("Found", nrow(blob_list), "file(s) to download\n")
+  cat("Found", length(blob_names), "file(s) to download\n")
 
   downloaded_files <- c()
 
-  for (i in seq_len(nrow(blob_list))) {
-    blob_name <- blob_list$name[i]
+  for (i in seq_along(blob_names)) {
+    blob_name <- blob_names[i]
     output_file <- file.path(output_dir, basename(blob_name))
 
-    cat(sprintf("  [%d/%d] Downloading: %s\n", i, nrow(blob_list), blob_name))
+    cat(sprintf("  [%d/%d] Downloading: %s\n", i, length(blob_names), blob_name))
 
-    tryCatch({
-      AzureStor::storage_download(container, blob_name, output_file, overwrite = TRUE)
-      downloaded_files <- c(downloaded_files, output_file)
+    blob_url <- paste0(container_base, "/", utils::URLencode(blob_name),
+                       "?", result_info$sasToken)
+
+    ok <- tryCatch({
+      httr2::request(blob_url) |>
+        httr2::req_retry(max_tries = 3) |>
+        httr2::req_perform(path = output_file)
+      TRUE
     }, error = function(e) {
-      cat("    ERROR downloading", blob_name, ":", e$message, "\n")
+      cat("    ERROR downloading", blob_name, ":", conditionMessage(e), "\n")
+      FALSE
     })
+
+    if (ok) downloaded_files <- c(downloaded_files, output_file)
   }
 
   cat("\n========================================\n")
@@ -440,6 +591,42 @@ get_mobilescapes_related_visits <- function(
   cat("========================================\n")
 
   downloaded_files
+}
+
+#' List Blob Names in an Extract Container
+#'
+#' Reads the Azure container listing XML from the pre-signed `blobList` URL,
+#' following `NextMarker` continuations.
+#'
+#' @param blob_list_url Character. The `blobList` URL from the result payload.
+#'
+#' @return Character vector of blob names.
+#' @keywords internal
+.list_extract_blobs <- function(blob_list_url) {
+  names_found <- character(0)
+  marker <- NULL
+
+  repeat {
+    url <- if (is.null(marker)) {
+      blob_list_url
+    } else {
+      paste0(blob_list_url, "&marker=", utils::URLencode(marker, reserved = TRUE))
+    }
+
+    xml <- httr2::request(url) |>
+      httr2::req_retry(max_tries = 3) |>
+      httr2::req_perform() |>
+      httr2::resp_body_string()
+
+    hits <- regmatches(xml, gregexpr("<Name>[^<]*</Name>", xml))[[1]]
+    names_found <- c(names_found, gsub("</?Name>", "", hits))
+
+    nm <- regmatches(xml, regexpr("<NextMarker>[^<]*</NextMarker>", xml))
+    marker <- if (length(nm) == 0) NULL else gsub("</?NextMarker>", "", nm)
+    if (is.null(marker) || !nzchar(marker)) break
+  }
+
+  unique(names_found)
 }
 
 # Data Processing Functions ######################################################
@@ -518,11 +705,17 @@ get_mobilescapes_related_visits <- function(
 #' @param geofence_ids Character vector. EA geofence IDs.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
-#' @param days_of_week Character vector. Optional. e.g. c("Mon", "Tue").
-#' @param time_of_day Character. Optional. Default "AllDay".
-#' @param dwell Character. Optional. Default "Any".
+#' @param days_of_week Character vector. Optional. "Mon" through "Sun".
+#' @param time_of_day Character. Optional. One of "AllDay", "Morning",
+#'   "Afternoon", "Evening". Default "AllDay".
+#' @param dwell Character. Optional. One of "Any", "Short", "Medium",
+#'   "Long". Default "Any".
 #' @param country Character. 2-digit country code. Default "ca".
 #' @param vintage Character or numeric. Dataset vintage (e.g. "2026").
+#'
+#' @param ... Not used. Present only so that passing a removed v4 argument
+#'   (e.g. `geojson`, `use_weights`, `daily_time_filter`) fails immediately
+#'   with a migration hint instead of a generic "unused argument" error.
 #'
 #' @return Invisibly returns NULL. Outputs dry run to "test_mobilescapes_query.txt".
 #'
@@ -535,8 +728,11 @@ test_query_mobilescapes <- function(
     time_of_day = "AllDay",
     dwell = "Any",
     country = "ca",
-    vintage
+    vintage,
+    ...
 ) {
+  .reject_legacy_args(list(...), "test_query_mobilescapes")
+
   cat("Saving DRY MobileScapes request...\n")
 
   body <- .report_body(
@@ -564,16 +760,32 @@ test_query_mobilescapes <- function(
 #'   [discover_mobilescapes_geofences()]).
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
-#' @param days_of_week Character vector. Optional. e.g. c("Mon", "Tue").
-#' @param time_of_day Character. Optional. Default "AllDay".
-#' @param dwell Character. Optional. Default "Any".
+#' @param days_of_week Character vector. Optional. "Mon" through "Sun".
+#' @param time_of_day Character. Optional. One of "AllDay", "Morning",
+#'   "Afternoon", "Evening". Default "AllDay".
+#' @param dwell Character. Optional. One of "Any", "Short", "Medium",
+#'   "Long". Default "Any".
 #' @param country Character. 2-digit country code. Default "ca".
 #' @param vintage Character or numeric. Dataset vintage (e.g. "2026").
 #' @param output_name Character. Optional. Base name for the output CSV file.
 #'   Defaults to a name derived from the date range.
 #' @param output_dir Character. Optional (default: "ea_output"). Output directory.
+#' @param ... Not used. Present only so that passing a removed v4 argument
+#'   (e.g. `geojson`, `use_weights`, `daily_time_filter`) fails immediately
+#'   with a migration hint instead of a generic "unused argument" error.
 #'
-#' @return Creates output files in specified output directory. Returns directory of files as a character.
+#' @return Creates output files in specified output directory. Returns
+#'   directory of files as a character. The consolidated CSV is one row per
+#'   origin postal code, verified against a real extract, with columns
+#'   including `GeofenceName`, `Visits`, `PostalCode`, `LATITUDE`,
+#'   `LONGITUDE`, `Sunday`...`Saturday`, `January`...`December`, and the full
+#'   geography hierarchy (`PRCDDA`, `PRCDCSD`, `CMACT`, `FSA`, `PR`, etc. -
+#'   each with a matching `_NAME` column). There is no PRIZM segment column
+#'   and no time-of-day breakdown - see `time_of_day`/`dwell` above for the
+#'   only filtering available on those dimensions. `GeofenceName` means a
+#'   single extract can cover many geofences at once; unlike
+#'   [get_mobilescapes_origins()], results are not pooled across
+#'   `geofence_ids`.
 #'
 #' @export
 pull_mobilescapes <- function(
@@ -586,8 +798,11 @@ pull_mobilescapes <- function(
     country = "ca",
     vintage,
     output_name = NULL,
-    output_dir = "ea_output"
+    output_dir = "ea_output",
+    ...
 ) {
+  .reject_legacy_args(list(...), "pull_mobilescapes")
+
   cat("\n########################################\n")
 
   # Print summary of submission

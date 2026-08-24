@@ -24,13 +24,29 @@ get_mobilescapes_origins(
 
 \item{end_date}{Character. End date in "YYYY-MM-DD" format.}
 
-\item{geo_level_code}{Character. Geographic level to group origins by (e.g. "FSA").}
+\item{geo_level_code}{Character. Required. Geographic level to group origins
+by. Allowed values, finest to coarsest (verified against the v5 API):
+\itemize{
+  \item `"PRCDDA"`   - Dissemination Area (finest available)
+  \item `"PRCDADA"`  - Aggregate Dissemination Area
+  \item `"FSA"`      - Forward Sortation Area (first 3 postal characters)
+  \item `"PRCDCSD"`  - Census Subdivision (municipality)
+  \item `"PRCD"`     - Census Division
+  \item `"CMACA"`    - Census Metropolitan Area / Census Agglomeration
+  \item `"PR"`       - Province
+}
+This report returns aggregated counts only, one level per request. For
+coordinates, postal code, census tract, or a per-geofence breakout, use
+the CSV extract via `pull_mobilescapes()` instead - it still carries
+`LATITUDE`/`LONGITUDE` and the full geography hierarchy.}
 
 \item{days_of_week}{Character vector. Optional. e.g. c("Sat", "Sun").}
 
-\item{time_of_day}{Character. Optional. Default "AllDay".}
+\item{time_of_day}{Character. Optional. One of "AllDay", "Morning",
+"Afternoon", "Evening". Default "AllDay".}
 
-\item{dwell}{Character. Optional. Default "Any".}
+\item{dwell}{Character. Optional. One of "Any", "Short", "Medium",
+"Long". Default "Any".}
 
 \item{target_set}{List. Optional. List of `list(targetGroupId = ..., segmentCodes = ...)`.}
 
@@ -45,4 +61,9 @@ Data frame with columns `geoCode` and `visits`.
 Returns aggregated origin visit counts showing where visitors are coming
 from to visit the selected geofence(s), grouped by the requested
 geographic level.
+}
+\details{
+Note: results are pooled across all `geofence_ids` in the request - the
+response carries no per-geofence breakdown. For a per-area origin profile,
+call this once per area.
 }

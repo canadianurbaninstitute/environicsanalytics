@@ -7,9 +7,11 @@
 discover_mobilescapes_geofences(
   filter_definition = NULL,
   page = 1,
-  page_size = 25,
+  page_size = 100,
   sort_by = "GEOFENCE_ID",
   sort_direction = "asc",
+  all_pages = TRUE,
+  max_pages = 100,
   country = "ca",
   vintage
 )
@@ -18,15 +20,23 @@ discover_mobilescapes_geofences(
 \item{filter_definition}{Character. Optional. Filter expression, e.g.
 `"PRCDCSD_NAME IN ('Toronto, ON (C)') AND PR_NAME IN ('Ontario')"`.}
 
-\item{page}{Numeric. Page number. Default 1.}
+\item{page}{Numeric. Page number to start from. Default 1.}
 
-\item{page_size}{Numeric. Results per page. Default 25.}
+\item{page_size}{Numeric. Results per page. Default 100. The API does not
+document a maximum; if a large value errors, lower it.}
 
 \item{sort_by}{Character. One of GEOFENCE_ID, GEOFENCE_NAME, PRCDCSD_NAME,
 CMACA_NAME, PR_NAME, BANNER, PARENT_COMPANY, CATEGORY, SUB_CATEGORY,
 GEOFENCE_TYPE, IS_PRIMARY_POLYGON, GEOFENCE_SQUARE_FOOTAGE. Default "GEOFENCE_ID".}
 
 \item{sort_direction}{Character. "asc" or "desc". Default "asc".}
+
+\item{all_pages}{Logical. If TRUE (default) keep requesting successive
+pages until the API returns a short page, so the full matching set is
+returned. If FALSE, return only the single page given by `page`.}
+
+\item{max_pages}{Numeric. Safety cap on the number of pages fetched when
+`all_pages = TRUE`. Default 100. A warning is issued if it is hit.}
 
 \item{country}{Character. 2-digit country code. Default "ca".}
 

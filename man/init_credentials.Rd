@@ -7,8 +7,8 @@
 init_credentials(
   client_id = Sys.getenv("CLIENT_ID"),
   client_secret = Sys.getenv("CLIENT_SECRET"),
-  scope = Sys.getenv("SCOPE", "mobilescapes"),
-  token_url = "https://login.environicsanalytics.com/connect/token"
+  scope = Sys.getenv("SCOPE", .EA_DEFAULT_SCOPE),
+  token_url = Sys.getenv("TOKEN_URL", .EA_DEFAULT_TOKEN_URL)
 )
 }
 \arguments{
@@ -16,9 +16,12 @@ init_credentials(
 
 \item{client_secret}{Character. OAuth client secret}
 
-\item{scope}{Character. OAuth scope (default: "mobilescapes")}
+\item{scope}{Character. OAuth scope. As of MobileScapes v5 this is a
+Microsoft Entra scope, e.g. "https://eaplatform.onmicrosoft.com/api/.default".}
 
-\item{token_url}{Character. Token endpoint URL}
+\item{token_url}{Character. Token endpoint URL. As of v5 this is the
+Microsoft Entra endpoint; the legacy IdentityServer endpoint
+(login.environicsanalytics.com/connect/token) returns "invalid_client".}
 }
 \value{
 Invisibly TRUE if credentials are valid, stops with error otherwise

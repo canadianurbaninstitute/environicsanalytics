@@ -22,11 +22,13 @@ get_mobilescapes_destination_summary(
 
 \item{end_date}{Character. End date in "YYYY-MM-DD" format.}
 
-\item{days_of_week}{Character vector. Optional. e.g. c("Mon", "Tue").}
+\item{days_of_week}{Character vector. Optional. "Mon" through "Sun".}
 
-\item{time_of_day}{Character. Optional. Default "AllDay".}
+\item{time_of_day}{Character. Optional. One of "AllDay", "Morning",
+"Afternoon", "Evening". Default "AllDay".}
 
-\item{dwell}{Character. Optional. Default "Any".}
+\item{dwell}{Character. Optional. One of "Any", "Short", "Medium",
+"Long". Default "Any".}
 
 \item{country}{Character. 2-digit country code. Default "ca".}
 

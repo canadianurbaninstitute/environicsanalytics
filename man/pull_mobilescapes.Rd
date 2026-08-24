@@ -14,7 +14,8 @@ pull_mobilescapes(
   country = "ca",
   vintage,
   output_name = NULL,
-  output_dir = "ea_output"
+  output_dir = "ea_output",
+  ...
 )
 }
 \arguments{
@@ -25,11 +26,13 @@ pull_mobilescapes(
 
 \item{end_date}{Character. End date in "YYYY-MM-DD" format.}
 
-\item{days_of_week}{Character vector. Optional. e.g. c("Mon", "Tue").}
+\item{days_of_week}{Character vector. Optional. "Mon" through "Sun".}
 
-\item{time_of_day}{Character. Optional. Default "AllDay".}
+\item{time_of_day}{Character. Optional. One of "AllDay", "Morning",
+"Afternoon", "Evening". Default "AllDay".}
 
-\item{dwell}{Character. Optional. Default "Any".}
+\item{dwell}{Character. Optional. One of "Any", "Short", "Medium",
+"Long". Default "Any".}
 
 \item{country}{Character. 2-digit country code. Default "ca".}
 
@@ -39,9 +42,24 @@ pull_mobilescapes(
 Defaults to a name derived from the date range.}
 
 \item{output_dir}{Character. Optional (default: "ea_output"). Output directory.}
+
+\item{...}{Not used. Present only so that passing a removed v4 argument
+(e.g. `geojson`, `use_weights`, `daily_time_filter`) fails immediately
+with a migration hint instead of a generic "unused argument" error.}
 }
 \value{
-Creates output files in specified output directory. Returns directory of files as a character.
+Creates output files in specified output directory. Returns
+  directory of files as a character. The consolidated CSV is one row per
+  origin postal code, verified against a real extract, with columns
+  including `GeofenceName`, `Visits`, `PostalCode`, `LATITUDE`,
+  `LONGITUDE`, `Sunday`...`Saturday`, `January`...`December`, and the full
+  geography hierarchy (`PRCDDA`, `PRCDCSD`, `CMACT`, `FSA`, `PR`, etc. -
+  each with a matching `_NAME` column). There is no PRIZM segment column
+  and no time-of-day breakdown - see `time_of_day`/`dwell` above for the
+  only filtering available on those dimensions. `GeofenceName` means a
+  single extract can cover many geofences at once; unlike
+  [get_mobilescapes_origins()], results are not pooled across
+  `geofence_ids`.
 }
 \description{
 Authenticates with the API using a bearer token, submits an Origins

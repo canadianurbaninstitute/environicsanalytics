@@ -2,11 +2,16 @@
 % Please edit documentation in R/mobilescapes-api.R
 \name{.download_extract_files}
 \alias{.download_extract_files}
-\title{Download MobileScapes Extract Files from Azure Blob Storage}
+\title{Download MobileScapes Extract Files}
 \usage{
 .download_extract_files(request_id, country, vintage, output_dir = "temp")
 }
 \description{
-Download MobileScapes Extract Files from Azure Blob Storage
+v5 serves extract output from a custom CDN host
+(`https://cdn.environicsanalytics.com`) with the container nested under a
+path prefix, rather than from `<account>.blob.core.windows.net`. AzureStor
+infers the storage service from the hostname and rejects that URL with
+"Unknown endpoint service", so the container is read directly over HTTP
+using the pre-signed `blobList` URL the API returns.
 }
 \keyword{internal}
