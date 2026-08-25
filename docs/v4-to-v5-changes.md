@@ -22,20 +22,23 @@ Claims below are marked **[docs]** where the documentation states them and
 
 ## 0. Executive summary
 
-The five changes that actually cost work:
+The six changes that actually cost work:
 
 1. **Authentication moved to Microsoft Entra.** v4 credentials flow no longer
    works; the old token endpoint returns `invalid_client`. **[verified]**
 2. **Custom geography is gone.** No GeoJSON, no WKT. Only EA Geofence Library
    IDs. **[docs]**
-3. **Origin detail depends on which path you use.** The *synchronous* origins
+3. **"Custom" geofence IDs (`C`-prefix) don't work in MobileScapes v5 at
+   all** - only `"EA Standard"` IDs (`E`-prefix) do, even though both types
+   are presented identically in the Envision UI. See §4. **[verified]**
+4. **Origin detail depends on which path you use.** The *synchronous* origins
    report returns counts aggregated to one standard geography (finest:
    `PRCDDA`) with no coordinates. The *async CSV extract* still returns
    `LATITUDE`/`LONGITUDE`, full postal code, and the whole geography hierarchy,
    as v4 did. **[verified]**
-4. **The extract is Origins-only.** The v4 CEL/CDL pair and the
+5. **The extract is Origins-only.** The v4 CEL/CDL pair and the
    `geofencepings` report have no v5 equivalent. **[docs]**
-5. **Data methodology changed.** v4 and v5 numbers are not a continuous time
+6. **Data methodology changed.** v4 and v5 numbers are not a continuous time
    series. **[docs]**
 
 ---
@@ -144,6 +147,56 @@ Sortable fields: `GEOFENCE_ID`, `GEOFENCE_NAME`, `PRCDCSD_NAME`, `CMACA_NAME`,
 `PR_NAME`, `BANNER`, `PARENT_COMPANY`, `CATEGORY`, `SUB_CATEGORY`,
 `GEOFENCE_TYPE`, `IS_PRIMARY_POLYGON`, `GEOFENCE_SQUARE_FOOTAGE`.
 
+### "Custom" geofences are not usable in MobileScapes v5 **[verified]**
+
+The EA Geofence Library (as seen in the Envision UI) contains at least two
+`GEOFENCE_TYPE` values: `"EA Standard"` (EA's own pre-existing library
+entries, ID prefix `E`, e.g. `E2182542`) and `"Custom"` (geofences
+registered for a specific client/project, ID prefix `C`, e.g. `C12720`).
+Both types are shown side by side in the Envision UI and both have real,
+resolvable geofence IDs.
+
+**Only `E`-prefixed ("EA Standard") IDs work against MobileScapes v5.**
+Submitting a `C`-prefixed ("Custom") ID to any report endpoint or the
+extract returns an explicit `400`:
+
+```json
+{"problemDetails":"Invalid geofence ID(s): C12720"}
+```
+
+This is not a batching artifact - it reproduces identically for a single
+`C`-prefixed ID submitted alone, and does not affect `E`-prefixed IDs
+submitted in the same request. Practical effect on a project with a mix of
+both (Main Street Index: 60 `E`-prefixed, 37 `C`-prefixed out of 97 resolved
+areas): **the `C`-prefixed third of the areas cannot currently be pulled
+from MobileScapes v5 at all**, regardless of how the request is built. The
+cause is unconfirmed - most likely "Custom" geofences belong to a different
+EA product/API within Envision that happens to share the same UI picker and
+ID-lookup surface as MobileScapes, rather than being MobileScapes-specific.
+This needs confirmation from EA, not further client-side troubleshooting.
+
+### A short date range can silently return zero rows for a valid geofence **[verified]**
+
+`get_mobilescapes_destinations()` (and by extension anything built on the
+same report pattern) returns an **empty result with no error** for a valid,
+correctly-typed `E`-prefixed geofence ID if that geofence had no recorded
+visits in the requested window - it does not return a `visits = 0` row.
+
+Confirmed directly: the same real geofence ID returned zero rows for a
+single month, then returned a substantial, clearly real visit count for a
+12-month window ending on the same date:
+
+| Window | Result |
+|---|---|
+| `2026-06-01` to `2026-06-30` (1 month) | 0 rows |
+| `2025-07-01` to `2026-06-30` (12 months, the max allowed) | 1 row, `visits = 2,175,612` |
+
+**A missing row from a narrow-window test is not evidence the ID is
+invalid** - it can just mean "no traffic in that specific window." Test
+wider windows before concluding a geofence ID doesn't work, and don't
+silently treat request-ID-count vs. response-row-count mismatches as
+errors when building automated pipelines - they can be legitimate.
+
 ---
 
 ## 5. Origin geography — depends on the path
@@ -168,6 +221,16 @@ hierarchy level from `CAN` down to `PRCDDA`, plus `GeofenceName` so multiple
 geofences can share one extract. Verified by downloading a real extract:
 791 rows x 55 columns for one geofence over one month. See
 [msmdata-v5-impact.md §2.1](msmdata-v5-impact.md) for the full header.
+
+**Multi-geofence extracts are confirmed to split correctly by `GeofenceName`
+- not just inferred from the column existing.** Submitted one extract with
+two real geofence IDs (Downtown Barrie BIA, Downtown Halifax BIA) over the
+same 12-month window: `GeofenceName` cleanly separated 170,897 rows into
+the two areas, and each area's summed `Visits` matched its
+`get_mobilescapes_destinations()` total exactly (Barrie: 2,175,612 both
+ways; Halifax: 12,800,443 both ways). One extract call, submitted at or
+under `maxGeofenceIds` (500), is a genuine substitute for N per-area calls.
+**[verified]**
 
 ### Allowed `geoLevelCode` values **[verified]**
 
@@ -342,6 +405,11 @@ available as an origin `geoLevelCode`. **[unverified]**
 
 ### Still open
 
+- **Why "Custom" geofences are rejected by MobileScapes v5 is unconfirmed**
+  (see §4). Needs an answer from EA - whether Custom geofences require a
+  different vintage/country, a different endpoint, or simply aren't a
+  MobileScapes-compatible geofence type regardless of how they're
+  registered.
 - The extract contained 377 distinct DAs where the synchronous report returned
   412, for the same geofence and period, despite identical visit totals. Some
   rows carry placeholder geography codes (`0000000.00`, "Rest of Canada").

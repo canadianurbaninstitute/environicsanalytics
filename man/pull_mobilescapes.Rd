@@ -20,7 +20,10 @@ pull_mobilescapes(
 }
 \arguments{
 \item{geofence_ids}{Character vector. EA geofence IDs (see
-[discover_mobilescapes_geofences()]).}
+[discover_mobilescapes_geofences()]). Only `"EA Standard"` geofences
+(ID prefix `E`) work here - `"Custom"` geofences (ID prefix `C`) are
+rejected with `400 Invalid geofence ID(s)`, even though the Envision UI
+presents both types identically. See docs/v4-to-v5-changes.md, verified.}
 
 \item{start_date}{Character. Start date in "YYYY-MM-DD" format.}
 

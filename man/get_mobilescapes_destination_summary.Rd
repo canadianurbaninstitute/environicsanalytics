@@ -16,7 +16,13 @@ get_mobilescapes_destination_summary(
 )
 }
 \arguments{
-\item{geofence_ids}{Character vector. EA geofence IDs.}
+\item{geofence_ids}{Character vector. EA geofence IDs. Only `"EA Standard"`
+geofences (ID prefix `E`, e.g. `"E12345"`) work here - `"Custom"`
+geofences (ID prefix `C`) are rejected with `400 Invalid geofence
+ID(s)`, even though the Envision UI presents both types identically.
+A short date range can also legitimately return zero rows for a valid
+`E`-prefixed ID with no visits in that window - that is not the same
+as an invalid ID. See docs/v4-to-v5-changes.md for both, verified.}
 
 \item{start_date}{Character. Start date in "YYYY-MM-DD" format.}
 

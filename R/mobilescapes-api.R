@@ -77,7 +77,13 @@
 #' Constructs the shared request body fields used by the Origins,
 #' Destinations, Destination Summary, and Origins Extract endpoints.
 #'
-#' @param geofence_ids Character vector. EA geofence IDs.
+#' @param geofence_ids Character vector. EA geofence IDs. Only `"EA Standard"`
+#'   geofences (ID prefix `E`, e.g. `"E12345"`) work here - `"Custom"`
+#'   geofences (ID prefix `C`) are rejected with `400 Invalid geofence
+#'   ID(s)`, even though the Envision UI presents both types identically.
+#'   A short date range can also legitimately return zero rows for a valid
+#'   `E`-prefixed ID with no visits in that window - that is not the same
+#'   as an invalid ID. See docs/v4-to-v5-changes.md for both, verified.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
 #' @param days_of_week Character vector. Optional. "Mon" through "Sun".
@@ -299,7 +305,13 @@ discover_mobilescapes_geofences <- function(
 #' response carries no per-geofence breakdown. For a per-area origin profile,
 #' call this once per area.
 #'
-#' @param geofence_ids Character vector. EA geofence IDs.
+#' @param geofence_ids Character vector. EA geofence IDs. Only `"EA Standard"`
+#'   geofences (ID prefix `E`, e.g. `"E12345"`) work here - `"Custom"`
+#'   geofences (ID prefix `C`) are rejected with `400 Invalid geofence
+#'   ID(s)`, even though the Envision UI presents both types identically.
+#'   A short date range can also legitimately return zero rows for a valid
+#'   `E`-prefixed ID with no visits in that window - that is not the same
+#'   as an invalid ID. See docs/v4-to-v5-changes.md for both, verified.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
 #' @param geo_level_code Character. Required. Geographic level to group origins
@@ -359,7 +371,13 @@ get_mobilescapes_origins <- function(
 #' Returns visit metrics for each destination geofence, including total
 #' visits, optional year-over-year change, and coordinates for mapping.
 #'
-#' @param geofence_ids Character vector. EA geofence IDs.
+#' @param geofence_ids Character vector. EA geofence IDs. Only `"EA Standard"`
+#'   geofences (ID prefix `E`, e.g. `"E12345"`) work here - `"Custom"`
+#'   geofences (ID prefix `C`) are rejected with `400 Invalid geofence
+#'   ID(s)`, even though the Envision UI presents both types identically.
+#'   A short date range can also legitimately return zero rows for a valid
+#'   `E`-prefixed ID with no visits in that window - that is not the same
+#'   as an invalid ID. See docs/v4-to-v5-changes.md for both, verified.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
 #' @param days_of_week Character vector. Optional. "Mon" through "Sun".
@@ -405,7 +423,13 @@ get_mobilescapes_destinations <- function(
 #' including visit totals, weekday/weekend split, visitor origins,
 #' top audience segments, visit breakdowns, and demographics.
 #'
-#' @param geofence_ids Character vector. EA geofence IDs.
+#' @param geofence_ids Character vector. EA geofence IDs. Only `"EA Standard"`
+#'   geofences (ID prefix `E`, e.g. `"E12345"`) work here - `"Custom"`
+#'   geofences (ID prefix `C`) are rejected with `400 Invalid geofence
+#'   ID(s)`, even though the Envision UI presents both types identically.
+#'   A short date range can also legitimately return zero rows for a valid
+#'   `E`-prefixed ID with no visits in that window - that is not the same
+#'   as an invalid ID. See docs/v4-to-v5-changes.md for both, verified.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
 #' @param days_of_week Character vector. Optional. "Mon" through "Sun".
@@ -447,7 +471,10 @@ get_mobilescapes_destination_summary <- function(
 #' selected location, broken down by month. This endpoint supports a single
 #' geofence ID per request.
 #'
-#' @param geofence_id Character. A single EA geofence ID.
+#' @param geofence_id Character. A single EA geofence ID. Only
+#'   `"EA Standard"` geofences (ID prefix `E`) are confirmed to work across
+#'   MobileScapes v5 - `"Custom"` geofences (ID prefix `C`) are rejected on
+#'   every other endpoint tested; not separately verified here.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
 #' @param country Character. 2-digit country code. Default "ca".
@@ -702,7 +729,13 @@ get_mobilescapes_related_visits <- function(
 #' Shows exactly what httr2 package will send to the Environics API
 #' without sending anything. Primarily for debugging.
 #'
-#' @param geofence_ids Character vector. EA geofence IDs.
+#' @param geofence_ids Character vector. EA geofence IDs. Only `"EA Standard"`
+#'   geofences (ID prefix `E`, e.g. `"E12345"`) work here - `"Custom"`
+#'   geofences (ID prefix `C`) are rejected with `400 Invalid geofence
+#'   ID(s)`, even though the Envision UI presents both types identically.
+#'   A short date range can also legitimately return zero rows for a valid
+#'   `E`-prefixed ID with no visits in that window - that is not the same
+#'   as an invalid ID. See docs/v4-to-v5-changes.md for both, verified.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
 #' @param days_of_week Character vector. Optional. "Mon" through "Sun".
@@ -757,7 +790,10 @@ test_query_mobilescapes <- function(
 #' Azure, and merges them into a single consolidated CSV file.
 #'
 #' @param geofence_ids Character vector. EA geofence IDs (see
-#'   [discover_mobilescapes_geofences()]).
+#'   [discover_mobilescapes_geofences()]). Only `"EA Standard"` geofences
+#'   (ID prefix `E`) work here - `"Custom"` geofences (ID prefix `C`) are
+#'   rejected with `400 Invalid geofence ID(s)`, even though the Envision UI
+#'   presents both types identically. See docs/v4-to-v5-changes.md, verified.
 #' @param start_date Character. Start date in "YYYY-MM-DD" format.
 #' @param end_date Character. End date in "YYYY-MM-DD" format.
 #' @param days_of_week Character vector. Optional. "Mon" through "Sun".

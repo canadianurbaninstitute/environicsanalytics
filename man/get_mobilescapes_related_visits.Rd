@@ -13,7 +13,10 @@ get_mobilescapes_related_visits(
 )
 }
 \arguments{
-\item{geofence_id}{Character. A single EA geofence ID.}
+\item{geofence_id}{Character. A single EA geofence ID. Only
+`"EA Standard"` geofences (ID prefix `E`) are confirmed to work across
+MobileScapes v5 - `"Custom"` geofences (ID prefix `C`) are rejected on
+every other endpoint tested; not separately verified here.}
 
 \item{start_date}{Character. Start date in "YYYY-MM-DD" format.}
 

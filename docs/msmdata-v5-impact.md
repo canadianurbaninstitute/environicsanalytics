@@ -98,6 +98,9 @@ Three things this settles:
 - **Coordinates are still there.** `LATITUDE`/`LONGITUDE` per origin record.
 - **`GeofenceName` is a column**, so one extract covers many areas and can be
   split downstream. There is no one-call-per-area penalty on the extract path.
+  Confirmed with a real two-geofence extract: `GeofenceName` cleanly split
+  the output and each area's total matched its own `destinations()` call
+  exactly. **[verified]**
 - **The full geography hierarchy survives**, including `CMACT` (census tract)
   and `PRFED` (federal riding), which the synchronous report does not offer.
 
@@ -242,7 +245,16 @@ rate-limited — resolve area → geofence IDs once and cache it.
 1. **The synchronous origins report pools across all geofence IDs** in a
    request — no per-geofence column. Per-area output needs one call per area.
    **The extract does not have this problem** (`GeofenceName` column).
-2. **The extract does not validate on submit.** `POST /extracts/csv` returns
+   **[verified]**
+2. **A narrow date window can silently drop an area from the extract, not
+   just from synchronous reports.** Confirmed directly: a two-geofence
+   extract over a one-month window where one area had zero visits that
+   month produced output for only the other area - no error, no empty row
+   for the missing one. Re-running the same extract over a 12-month window
+   (both areas confirmed non-zero) produced both. Always sanity-check that
+   the number of distinct `GeofenceName` values in extract output matches
+   the number of `geofence_ids` submitted. **[verified]**
+3. **The extract does not validate on submit.** `POST /extracts/csv` returns
    `202` with a request ID even for a nonexistent geofence, and silently ignores
    unknown fields such as `geoLevelCode`. Errors surface later as a failed
    request.
