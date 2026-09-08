@@ -20,6 +20,7 @@ BARRIE <- "E2182542" # Downtown Barrie BIA
 HALIFAX <- "E2182592" # Downtown Halifax BIA
 JAMAICA <- "E2182783" # Little Jamaica (Toronto)
 BIA_124 <- "E2182571" # 124 Street BIA (Edmonton)
+AURORA <- "C11399"
 
 # 1. CONFIG - always start here =========================================
 #
@@ -98,9 +99,9 @@ get_mobilescapes_origins(
 # Same call, coarser level - compare row counts and total visits (should
 # match the destinations() total above, since it's the same underlying data):
 get_mobilescapes_origins(
-  geofence_ids = BARRIE,
+  geofence_ids = AURORA,
   start_date = "2025-07-01",
-  end_date = "2026-06-30",
+  end_date = "2025-09-30",
   geo_level_code = "FSA",
   vintage = VINTAGE
 )
@@ -168,9 +169,9 @@ discover_mobilescapes_geofences(
 # strictly more detail than get_mobilescapes_origins() offers.
 #
 pull_mobilescapes(
-  geofence_ids = c(BARRIE, HALIFAX),
+  geofence_ids = c(BARRIE),
   start_date = "2026-05-01",
   end_date = "2026-05-31",
   vintage = VINTAGE,
-  output_name = "example_pull"
+  output_name = "barrie_pull"
 )
