@@ -94,7 +94,7 @@ the v5 collection publishes only v5.
 | `dataVintage` (body; vintage of geography to append) | `{vintage}` path segment; different meaning (dataset vintage), required |
 | `useWeights` | **Removed** — data is always modelled/calibrated |
 | `aggregatePolygons`, `aggregatePolygonName` | **Removed** |
-| `appendSegmentation` (`prizm`, `prizmda`, `prizmqc`, `prizmqcda`) | **Removed** from extract; `targetSet` on the origins/destinations reports instead |
+| `appendSegmentation` (`prizm`, `prizmda`, `prizmqc`, `prizmqcda`) | **Removed** as a *request* parameter, but the extract now returns PRIZM unconditionally as `PZMLLIC` (+ `INSEGMENTATION_PZMLLIC`) **[verified 2026-09-15]**. `targetSet` remains available on the origins/destinations reports |
 | `dailyTimeFilter` (dayPart array: `daysOfWeek` + `startTime`/`endTime` in `hh:mm`) | `daysOfWeek` + `timeOfDay`. **Arbitrary hour windows are no longer possible** |
 | `pingFilter` (`first` / `firstlast` / `none`) | **Removed.** `dwell` is a new, semantically different filter (visit duration) |
 | `reportType` (`celcdl`, `geofencepings`) | **Removed.** Extract is Origins-only; `geofencepings` has no equivalent |
@@ -117,10 +117,39 @@ Rejected: `EarlyMorning`, `MorningCommute`, `LateMorning`, `Midday`,
 seven day-parts do not carry over.
 
 **`timeOfDay` is a filter, not a breakdown.** No report returns a time-of-day
-split; each bucket costs its own request. The three named buckets are also not
-exhaustive — measured over one geofence for January 2026, `Morning + Afternoon
-+ Evening` = 98.9% of `AllDay`, leaving a 1.1% overnight residual with no
-selectable bucket. Derive it as `AllDay - (Morning + Afternoon + Evening)`.
+split; each bucket costs its own request.
+
+**The three named buckets overlap — they are not a partition of `AllDay`, and
+the overnight residual cannot be derived. [verified]** An earlier revision of
+this document claimed `Morning + Afternoon + Evening` = 98.9% of `AllDay`,
+leaving a 1.1% overnight residual recoverable as
+`AllDay - (Morning + Afternoon + Evening)`. **That is wrong.** Re-measured
+across three geofences over 2025-07-01 to 2026-06-30 via
+`get_mobilescapes_destinations()`, the three buckets *exceed* `AllDay` every
+time:
+
+| Geofence | `AllDay` | `M+A+E` | ratio |
+|---|---|---|---|
+| `E2182542` (Barrie) | 2,175,612 | 2,349,746 | **1.080** |
+| `E2182592` (Halifax) | 12,800,443 | 15,528,720 | **1.213** |
+| `C12401` (Baby Point Gates) | 1,492,628 | 1,693,266 | **1.134** |
+
+The overshoot is stable per geofence — Barrie held at 1.079 over both
+2024-07-01→2025-06-30 and 2025-01-01→2025-12-31 — but varies by geofence
+(8%–21%), so it is not a fixed correction factor either.
+
+Consequences:
+
+- The subtraction yields a **negative** number. There is no overnight bucket and
+  no way to reconstruct one.
+- Bucket values **cannot be expressed as percentages of `AllDay`** — they sum to
+  more than 100%.
+- They can still be normalised *among themselves* to show relative emphasis
+  across three buckets, but that is a share-of-buckets figure, not a
+  share-of-visits one, and should be labelled as such.
+- Because the buckets overlap, the undocumented hour boundaries are definitely
+  not contiguous cut points. Any UI label asserting explicit hours (e.g.
+  "Morning: 6am - 12pm", a v4 definition) is unsupported.
 
 The hour boundaries of each bucket, and the minute thresholds behind
 `Short`/`Medium`/`Long`, remain undocumented. **[unverified]**
@@ -269,8 +298,9 @@ January 2026 returned 412 rows:
 ### What was lost
 
 - **Nothing on the extract path**, geography-wise — coordinates, census tract
-  (`CMACT`), `REG` and `PRFED` are all present. The genuine losses are the seven
-  day-part columns and the PRIZM `SEGMENT` column.
+  (`CMACT`), `REG` and `PRFED` are all present. The genuine loss is the seven
+  day-part columns. The PRIZM `SEGMENT` column was also lost initially but has
+  since been restored as `PZMLLIC` **[verified 2026-09-15]**.
 - **On the synchronous report path**: coordinates, census tract, `REG` and
   `PRFED` are all unavailable — that path offers only the seven
   `geoLevelCode` values above.

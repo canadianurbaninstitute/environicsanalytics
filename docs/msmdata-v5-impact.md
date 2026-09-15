@@ -24,16 +24,16 @@ Much less than first feared. The bulk CSV download we already use still tells
 us **where visitors came from, down to the postal code, with map coordinates** —
 the same detail we have today. What changed is the plumbing: how we ask for the
 data, how we log in, and how areas are identified. The one real content loss is
-**time-of-day detail**, which drops from seven slots to four. Everything else we
-publish either survives intact or gets better.
+**time-of-day detail**, which drops from seven slots to three overlapping ones.
+Everything else we publish either survives intact or gets better.
 
 ### The short version
 
 | | |
 |---|---|
-| ✅ **Still works** | Visitor heat map, visits by postal code / neighbourhood, distance travelled, visit counts, busiest day of the week, comparisons over time |
-| ⚠️ **Works, but coarser** | Time of day — four slots instead of seven |
-| ❌ **Gone** | Visitor lifestyle (PRIZM) segments attached to individual visitors |
+| ✅ **Still works** | Visitor heat map, visits by postal code / neighbourhood, distance travelled, visit counts, busiest day of the week, comparisons over time, visitor lifestyle (PRIZM) segments |
+| ⚠️ **Works, but coarser** | Time of day — three bars instead of four, and they overlap |
+| ❌ **Gone** | The Early Morning (12am–6am) time band |
 | ✨ **New, didn't have before** | Year-over-year comparisons, weekday vs weekend splits, built-in demographics, and "where else did these visitors go" |
 
 ### What to flag to stakeholders
@@ -49,14 +49,15 @@ postal code) because they are modelled estimates rather than raw counts. Totals
 remain meaningful; small individual numbers should be treated as estimates and
 rounded for display.
 
-**3. The time-of-day chart loses detail.** We currently show four time bands
-built from seven underlying slots. We can still show four bands, but they are
-now the vendor's own definitions and we don't know exactly which hours they
-cover.
+**3. The time-of-day chart loses a bar.** We currently show four time bands
+built from seven underlying slots. v5 offers three, they are the vendor's own
+definitions, we don't know which hours they cover, and they overlap — so the
+overnight band is gone and the percentages are "share across the three bands"
+rather than "share of all visits".
 
-**4. The visitor lifestyle (PRIZM) chart needs a caveat or a rethink.** The new
-data doesn't tell us each visitor's segment. We can estimate it from the
-neighbourhood they came from, but that's an inference, not a measurement.
+**4. The visitor lifestyle (PRIZM) chart is fine.** Environics added segment
+codes back to the bulk download, so this works as it did before — no caveat and
+no rethink needed.
 
 ---
 
@@ -70,18 +71,21 @@ neighbourhood they came from, but that's an inference, not a measurement.
 | `process_visitor_heatmap()` | Visitor origin heat map | ✅ **Keep** | Extract `LATITUDE`/`LONGITUDE` — see §2.4 |
 | `process_visitor_quartiles()` | Visitor distance bands | ✅ **Keep** | Same coordinates, same method |
 | `create_summary_cards()` | Total / busiest day / busiest time | ⚠️ **Mostly** | Total and busiest day direct; busiest time needs extra calls |
-| `process_time_of_day()` | Visits by time of day | ⚠️ **Rebuild** | 4 buckets, filter-only — see §2.5 |
-| `process_top_prizm_segments()` | Top PRIZM segments by distance | ❌ **Rebuild** | No per-visitor segment — see §2.6 |
+| `process_time_of_day()` | Visits by time of day | ⚠️ **Adapt** | 3 overlapping buckets, filter-only — see §2.5 |
+| `process_top_prizm_segments()` | Top PRIZM segments by distance | ✅ **Keep** | `PZMLLIC` on the extract — see §2.6 |
 
 ### 2.1 The extract schema (verified)
 
 A real extract for one geofence over January 2026 returned **791 rows × 55
-columns**, one row per origin postal code:
+columns**, one row per origin postal code. EA has since added PRIZM
+segmentation, so the current schema is **57 columns** — re-verified 2026-09-15
+against `C12401` over 2026-04-01→2026-06-30 (8,663 rows × 57 columns):
 
 ```
 GeofenceName, Visits, PostalCode, LATITUDE, LONGITUDE,
 Sunday…Saturday, January…December,
 GEOCODETYPE, ISGEOCODED, ISBUSINESS, ISRETIRED, ISAPARTMENT, INDEMOGRAPHIC, ISLICENSED,
+PZMLLIC, INSEGMENTATION_PZMLLIC,
 CAN, REG, PR, CMACA, PRCD, PRCDCSD, CMACT, PRCDADA, PRCDDA, PRFED, FSA, FSALDU
   (each with a matching _NAME column)
 ```
@@ -103,6 +107,8 @@ Three things this settles:
   exactly. **[verified]**
 - **The full geography hierarchy survives**, including `CMACT` (census tract)
   and `PRFED` (federal riding), which the synchronous report does not offer.
+- **PRIZM segmentation is back** as `PZMLLIC` (plus an `INSEGMENTATION_PZMLLIC`
+  flag) — see §2.6.
 
 Cross-check: extract visits totalled **6,290.08**, exactly matching the
 synchronous origins report for the same geofence and period.
@@ -128,8 +134,8 @@ synchronous origins report for the same geofence and period.
 | `JANUARY`…`DECEMBER` | `January`…`December` |
 | `VISITOR` | **No equivalent** |
 | `WEEKDAY`, `WEEKEND` | **No equivalent** (derive from day columns) |
-| `EARLYMORNING`…`LATEEVENING` (7 day-parts) | **No equivalent** — see §2.5 |
-| `SEGMENT` (PRIZM) | **No equivalent** — see §2.6 |
+| `EARLYMORNING`…`LATEEVENING` (7 day-parts) | **No equivalent** — `timeOfDay` is a 3-bucket filter, and the buckets overlap; see §2.5 |
+| `SEGMENT` (PRIZM) | `PZMLLIC` — restored, see §2.6 |
 
 The rename is mostly mechanical: drop the `CEL_` prefix, change case. Note the
 column names are now **mixed case** (`Visits`, `Sunday`) where v4 was uppercase.
@@ -163,51 +169,86 @@ a **filter**, with this complete set of accepted values **[verified]**:
 
 `AllDay`, `Morning`, `Afternoon`, `Evening`
 
-Consequences:
+The filter **is** honoured on the extract path **[verified 2026-09-15]** — the
+same geofence and window returned 8,663 rows / 330,489 visits at `AllDay` and
+4,009 rows / 117,253 visits at `Morning` — so per-bucket extracts work and keep
+full origin detail.
 
-1. **One request per bucket** — 4 calls where v4 read 7 columns from one file.
-2. **No early-morning bucket, but it is derivable.** Measured on a real geofence
-   over January 2026:
+> **Correction (2026-09-15):** an earlier revision of this section said the
+> fourth (overnight) bar was derivable as
+> `AllDay − (Morning + Afternoon + Evening)`, based on a 98.9% / 1.1% split
+> measured on one geofence for January 2026. **That is wrong.** The three
+> buckets *overlap* and sum to *more* than `AllDay`.
 
-   | Bucket | Visits |
-   |---|---|
-   | AllDay | 6,290.08 |
-   | Morning | 1,453.87 |
-   | Afternoon | 3,049.06 |
-   | Evening | 1,718.89 |
-   | **Morning + Afternoon + Evening** | **6,221.82 (98.9%)** |
-   | **Residual (overnight)** | **68.26 (1.1%)** |
+Re-measured over 2025-07-01→2026-06-30 via `get_mobilescapes_destinations()`:
 
-   The fourth bar = `AllDay − (Morning + Afternoon + Evening)`, so the existing
-   four-category chart survives structurally.
-3. **Bucket boundaries are undocumented.** Our current axis labels
-   ("Morning: 6am – 12pm") are v4 definitions and may not match v5's cut points.
-   Either confirm with EA or drop the explicit hours from the labels.
+| Geofence | `AllDay` | `M+A+E` | ratio |
+|---|---|---|---|
+| `E2182542` (Barrie) | 2,175,612 | 2,349,746 | **1.080** |
+| `E2182592` (Halifax) | 12,800,443 | 15,528,720 | **1.213** |
+| `C12401` (Baby Point Gates) | 1,492,628 | 1,693,266 | **1.134** |
 
-### 2.6 PRIZM segments — no direct replacement
+Stable per geofence (Barrie held at 1.079 over two other 12-month windows) but
+varying 8%–21% between them, so it is not a fixed correction factor either.
 
-v4 carried a `SEGMENT` code per origin record. The v5 extract has no segment
-column, and `appendSegmentation` is gone.
+Consequences for `process_time_of_day()`:
 
-Two partial routes:
+1. **The chart drops from four bars to three.** Early Morning (12am–6am) is
+   gone and cannot be reconstructed — the subtraction returns a negative number.
+2. **The existing percentage calculation still works unchanged.** The function
+   already computes `Percentage = AvgVisits / sum(AvgVisits) * 100`, i.e. share
+   within the bucket set. That operation is identical with three categories.
+   But because the buckets overlap, `sum(AvgVisits)` is no longer a true total —
+   it is a share-of-buckets figure, not share-of-visits, and should be labelled
+   that way.
+3. **Drop the hour labels.** The current labels ("Morning: 6am - 12pm") are v4
+   definitions. v5 does not document its cut points, and the overlap proves they
+   are not contiguous — so asserting explicit hours is unsupported.
+4. **Cost: one request per bucket.** On the extract path that is 3 extracts per
+   period, but each carries `GeofenceName` and up to 500 geofence IDs, so 3
+   extracts cover *all* areas for a period — not 3 per area.
 
-- **Destination summary → `topSegments`** gives top segments by share of visits
-  per geofence, but **not** split by distance band.
-- **Join extract rows to our own DA-level PRIZM data.** msmdata already works at
-  `PRCDDA` in `process_ea_data()`, and the extract carries `PRCDDA` on every
-  row — so the join is direct, and distance bands still come from the row's own
-  coordinates.
+`get_mobilescapes_destinations()` also accepts `timeOfDay` and returns one row
+per geofence, which would be 3 cheap synchronous calls for all areas. **But it
+returns zero rows on narrow windows** — verified: Barrie returned nothing for
+both a 1-month and a 3-month window while returning 2.17M visits over 12 months.
+For a monthly chart, use the extract.
 
-The second route reproduces the current chart's shape but is an **ecological
-approximation**: it assumes visitors from a DA match that DA's overall profile.
-Label it as an estimate.
+### 2.6 PRIZM segments — restored as `PZMLLIC`
 
----
+> **Correction (2026-09-15):** this section previously said PRIZM had no v5
+> equivalent and `process_top_prizm_segments()` needed rebuilding as an
+> ecological approximation. EA has since added segmentation to the extract.
+
+The extract now carries **`PZMLLIC`** — the PRIZM segment code on each origin
+record, the direct equivalent of v4's `SEGMENT` — plus **`INSEGMENTATION_PZMLLIC`**,
+a boolean flag for whether the record is in the segmentation base.
+
+Verified 2026-09-15 on `C12401` over 2026-04-01→2026-06-30: `PZMLLIC` has **67
+distinct values** (the full Canadian PRIZM segment set), **zero NAs** across
+8,663 rows, most common codes `31`, `18`, `22`, `06`, `61`. `INSEGMENTATION_PZMLLIC`
+was `TRUE` for every row in that sample.
+
+This makes `process_top_prizm_segments()` a **direct port**, not a rebuild:
+`SEGMENT` → `PZMLLIC`, and the distance bands still come from each row's own
+`LATITUDE`/`LONGITUDE`. No ecological approximation and no caveat about
+inferring segment from neighbourhood is needed.
+
+Two things to confirm before relying on it:
+
+- **Code format.** Values are zero-padded two-character strings (`"06"`, not
+  `6`). Read as character, or leading zeros will be lost and joins to a PRIZM
+  lookup will silently miss.
+- **Whether `INSEGMENTATION_PZMLLIC` is ever `FALSE`.** It was uniformly `TRUE`
+  in the one sample checked. If it can be `FALSE`, decide whether to filter on
+  it before aggregating.
+
 
 ## Part 3 — What we gain
 
 | New capability | Endpoint |
 |---|---|
+| PRIZM segment per origin record, restored | Extract (`PZMLLIC`) |
 | Year-over-year change, computed by EA | Destinations (`percentChange`), destination summary |
 | Weekday vs weekend split | Destination summary |
 | Origin share inside vs outside market area | Destination summary |
@@ -228,7 +269,7 @@ may fit in a single extract, or a handful of chunked ones.
 | Purpose | Calls |
 |---|---|
 | Origins extract covering all areas (chunked by 500 geofences) | 1 per chunk |
-| Time of day, if needed (`Morning`, `Afternoon`, `Evening`, `AllDay`) | 4 per area |
+| Time of day, if needed (`Morning`, `Afternoon`, `Evening`) | 3 per **chunk**, not per area — the extract honours `timeOfDay` and carries `GeofenceName` |
 | Destination summary, if using EA's demographics / YoY | 1 per area |
 
 The extract path is dramatically cheaper than the per-area synchronous route. If
@@ -268,11 +309,19 @@ rate-limited — resolve area → geofence IDs once and cache it.
 ## Part 6 — Still unknown
 
 - **`timeOfDay` bucket boundaries** — the four values are confirmed, the hours
-  they represent are not.
+  they represent are not. They are known *not* to be a clean partition: the
+  three named buckets overlap and sum to 8%–21% more than `AllDay` (§2.5).
+- **Whether `INSEGMENTATION_PZMLLIC` is ever `FALSE`**, and the authoritative
+  `PZMLLIC` code → segment-name lookup for v5 (§2.6).
+- **Why an extract can complete with no files.** A Barrie extract over
+  2026-04-01→2026-06-30 reported success but produced no output, matching the
+  same geofence returning zero rows from `destinations()` on 1- and 3-month
+  windows while returning 2.17M visits over 12 months. Consistent with the
+  narrow-window behaviour in Part 5 §2, but the threshold is unknown.
 - **`dwell` thresholds** — `Short`/`Medium`/`Long` accepted; minute ranges
   undocumented.
 - **The 377 vs 412 DA discrepancy** between extract and synchronous report
   (§2.3).
 - **v5 daily quota figures** — v5 documents none; the v4 numbers are unconfirmed.
-- **Whether the extract respects a `targetSet` filter**, which might partially
-  restore segment-based analysis.
+- **Whether the extract respects a `targetSet` filter.** Less pressing now that
+  `PZMLLIC` restores segment-based analysis directly.

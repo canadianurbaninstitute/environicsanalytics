@@ -213,12 +213,14 @@ downstream work.
 
 **Async CSV extract (`pull_mobilescapes()`) — keeps v4's detail.** One row per
 origin postal code, verified against a real extract (791 rows x 55 columns for
-one geofence over one month):
+one geofence over one month; now 57 columns since EA added PRIZM segmentation —
+re-verified 2026-09-15, 8,663 rows x 57 columns):
 
 ```
 GeofenceName, Visits, PostalCode, LATITUDE, LONGITUDE,
 Sunday…Saturday, January…December,
 GEOCODETYPE, ISGEOCODED, ISBUSINESS, ISRETIRED, ISAPARTMENT, INDEMOGRAPHIC, ISLICENSED,
+PZMLLIC, INSEGMENTATION_PZMLLIC,
 CAN, REG, PR, CMACA, PRCD, PRCDCSD, CMACT, PRCDADA, PRCDDA, PRFED, FSA, FSALDU
   (each with a matching _NAME column)
 ```
@@ -231,8 +233,8 @@ Genuinely gone from the extract:
 
 | v4 column | Status |
 |---|---|
-| `EARLYMORNING`…`LATEEVENING` (7 day-parts) | **No equivalent** — `timeOfDay` is a filter with 4 values |
-| `SEGMENT` (PRIZM) | **No equivalent** — `appendSegmentation` removed |
+| `EARLYMORNING`…`LATEEVENING` (7 day-parts) | **No equivalent** — `timeOfDay` is a filter, and its three named buckets *overlap* (they sum to more than `AllDay`), so the overnight band cannot be derived |
+| `SEGMENT` (PRIZM) | **Restored** as `PZMLLIC` (+ `INSEGMENTATION_PZMLLIC`) — 67 segment codes, verified 2026-09-15 |
 | `VISITOR` | **No equivalent** |
 | `WEEKDAY`, `WEEKEND` | Derive from the day columns |
 
@@ -399,8 +401,8 @@ porting a v4 loop that assumed arbitrary polygon size and date range.
       `test_query_mobilescapes()` reject removed v4 arguments by name instead
       of a generic "unused argument" error)
 - [ ] Rename extract columns: `COMMON_EVENING_LAT`/`LON` → `LATITUDE`/`LONGITUDE`, drop `CEL_` prefixes
-- [ ] Replace time-of-day day-parts with the 4-value `time_of_day` filter
-- [ ] Rework PRIZM segment analysis — no per-visitor `SEGMENT` in v5
+- [ ] Replace time-of-day day-parts with the `time_of_day` filter — 3 usable buckets, one request each, and they overlap so they cannot be expressed as a share of `AllDay`
+- [ ] Map PRIZM `SEGMENT` → `PZMLLIC`; read it as character (codes are zero-padded, e.g. `"06"`)
 - [ ] If using the sync origins report, call it once per area (results pool); the extract needs no such split
 - [ ] Replace every GeoJSON/WKT input with a persisted area → `geofence_ids` mapping
 - [ ] Drop calls to `process_geojson_file()` and any oversize-splitting logic
