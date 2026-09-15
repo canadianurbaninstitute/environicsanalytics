@@ -233,7 +233,7 @@ Genuinely gone from the extract:
 
 | v4 column | Status |
 |---|---|
-| `EARLYMORNING`…`LATEEVENING` (7 day-parts) | **No equivalent** — `timeOfDay` is a filter, and its three named buckets *overlap* (they sum to more than `AllDay`), so the overnight band cannot be derived |
+| `EARLYMORNING`…`LATEEVENING` (7 day-parts) | **No equivalent** — `timeOfDay` is a filter with three usable bands (EA-confirmed: 6am-12pm, 12pm-6pm, 6pm-11:59pm) that *overlap* at the boundaries, summing to more than `AllDay`, so the overnight band cannot be derived |
 | `SEGMENT` (PRIZM) | **Restored** as `PZMLLIC` (+ `INSEGMENTATION_PZMLLIC`) — 67 segment codes, verified 2026-09-15 |
 | `VISITOR` | **No equivalent** |
 | `WEEKDAY`, `WEEKEND` | Derive from the day columns |
@@ -401,7 +401,7 @@ porting a v4 loop that assumed arbitrary polygon size and date range.
       `test_query_mobilescapes()` reject removed v4 arguments by name instead
       of a generic "unused argument" error)
 - [ ] Rename extract columns: `COMMON_EVENING_LAT`/`LON` → `LATITUDE`/`LONGITUDE`, drop `CEL_` prefixes
-- [ ] Replace time-of-day day-parts with the `time_of_day` filter — 3 usable buckets, one request each, and they overlap so they cannot be expressed as a share of `AllDay`
+- [ ] Replace time-of-day day-parts with the `time_of_day` filter — 3 usable bands (EA-confirmed 6am-12pm / 12pm-6pm / 6pm-11:59pm), one request each, overlapping so they cannot be expressed as a share of `AllDay`
 - [ ] Map PRIZM `SEGMENT` → `PZMLLIC`; read it as character (codes are zero-padded, e.g. `"06"`)
 - [ ] If using the sync origins report, call it once per area (results pool); the extract needs no such split
 - [ ] Replace every GeoJSON/WKT input with a persisted area → `geofence_ids` mapping

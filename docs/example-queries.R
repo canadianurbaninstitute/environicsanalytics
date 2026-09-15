@@ -155,7 +155,7 @@ str(related, max.level = 3)
 # only attribute filters like municipality, category, or banner.
 
 discover_mobilescapes_geofences(
-  filter_definition = "PRCDCSD_NAME IN ('Barrie, ON (C)')",
+  filter_definition = "GEOFENCE_NAME IN ('BarrhavenZone1b')",
   vintage = VINTAGE
 )
 # Paginates automatically (all_pages = TRUE by default) - returns every

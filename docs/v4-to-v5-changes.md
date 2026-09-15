@@ -147,9 +147,10 @@ Consequences:
 - They can still be normalised *among themselves* to show relative emphasis
   across three buckets, but that is a share-of-buckets figure, not a
   share-of-visits one, and should be labelled as such.
-- Because the buckets overlap, the undocumented hour boundaries are definitely
-  not contiguous cut points. Any UI label asserting explicit hours (e.g.
-  "Morning: 6am - 12pm", a v4 definition) is unsupported.
+- The boundaries themselves are **confirmed by Environics**: Morning 6am-12pm,
+  Afternoon 12pm-6pm, Evening 6pm-11:59pm. They are contiguous, which means the
+  overshoot comes from a visit spanning a boundary being counted in *both*
+  bands, not from gaps or unknown cut points. UI labels may state these hours.
 
 The hour boundaries of each bucket, and the minute thresholds behind
 `Short`/`Medium`/`Long`, remain undocumented. **[unverified]**

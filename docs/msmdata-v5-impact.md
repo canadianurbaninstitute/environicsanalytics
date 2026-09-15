@@ -201,9 +201,11 @@ Consequences for `process_time_of_day()`:
    But because the buckets overlap, `sum(AvgVisits)` is no longer a true total —
    it is a share-of-buckets figure, not share-of-visits, and should be labelled
    that way.
-3. **Drop the hour labels.** The current labels ("Morning: 6am - 12pm") are v4
-   definitions. v5 does not document its cut points, and the overlap proves they
-   are not contiguous — so asserting explicit hours is unsupported.
+3. **Update the Evening label.** EA has confirmed the bands: Morning 6am-12pm,
+   Afternoon 12pm-6pm, Evening 6pm-11:59pm. The hours can stay on the axis - but
+   v5's Evening ends at 11:59pm where v4's read "6pm - 12am", so the label
+   *string* changes. Anything matching on it must accept both, since
+   time_of_day_visits.csv accumulates across the changeover.
 4. **Cost: one request per bucket.** On the extract path that is 3 extracts per
    period, but each carries `GeofenceName` and up to 500 geofence IDs, so 3
    extracts cover *all* areas for a period — not 3 per area.
@@ -308,9 +310,11 @@ rate-limited — resolve area → geofence IDs once and cache it.
 
 ## Part 6 — Still unknown
 
-- **`timeOfDay` bucket boundaries** — the four values are confirmed, the hours
-  they represent are not. They are known *not* to be a clean partition: the
-  three named buckets overlap and sum to 8%–21% more than `AllDay` (§2.5).
+- ~~**`timeOfDay` bucket boundaries**~~ - **resolved.** EA confirmed Morning
+  6am-12pm, Afternoon 12pm-6pm, Evening 6pm-11:59pm. They are contiguous, so the
+  8%-21% overshoot over `AllDay` comes from visits spanning a boundary being
+  counted in both bands, not from unknown cut points (§2.5). Still unknown:
+  whether `AllDay` includes the overnight hours those three exclude.
 - **Whether `INSEGMENTATION_PZMLLIC` is ever `FALSE`**, and the authoritative
   `PZMLLIC` code → segment-name lookup for v5 (§2.6).
 - **Why an extract can complete with no files.** A Barrie extract over
