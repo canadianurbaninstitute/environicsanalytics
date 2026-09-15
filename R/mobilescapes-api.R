@@ -664,7 +664,8 @@ get_mobilescapes_related_visits <- function(
 #' consolidated file. Moves raw chunks to a 'raw' subdirectory.
 #'
 #' @keywords internal
-.merge_extract_chunks <- function(download_dir, output_dir = "output", output_name) {
+.merge_extract_chunks <- function(download_dir, output_dir = "output", output_name,
+                                  split_by = NULL) {
   cat("\n========================================\n")
   cat("Merging API result chunks...\n")
   cat("========================================\n")
@@ -700,6 +701,14 @@ get_mobilescapes_related_visits <- function(
   }
 
   cat("Processing", length(chunk_files_raw), "chunk file(s)...\n")
+
+  if (!is.null(split_by)) {
+    out <- .split_extract_chunks(chunk_files_raw, output_dir, split_by)
+    unlink(download_dir, recursive = TRUE)
+    gc()
+    return(out)
+  }
+
   chunk_data <- lapply(chunk_files_raw, function(f) {
     readr::read_csv(f, show_col_types = FALSE, col_types = readr::cols(.default = "c"))
   })
@@ -720,6 +729,85 @@ get_mobilescapes_related_visits <- function(
   gc()
 
   output_file
+}
+
+#' Split Extract Chunks Into One CSV Per Geofence
+#'
+#' Streams the downloaded chunks one at a time, appending each chunk's rows to
+#' a per-`split_by`-value CSV. Never holds more than one chunk in memory, which
+#' matters because a batched extract covering hundreds of geofences is far too
+#' large to bind into a single data frame - at roughly 2,900 rows per geofence
+#' per month, 500 geofences is ~1.5M rows.
+#'
+#' The API already returns the extract in chunks, so this simply routes those
+#' rows to their destination file rather than merging and re-splitting.
+#'
+#' Output file names are slugged from the value, so a `manifest.csv` mapping
+#' file name back to the exact original value is written alongside them.
+#'
+#' @param chunk_files Character vector of chunk file paths.
+#' @param output_dir Directory to write the per-geofence CSVs into.
+#' @param split_by Column name to split on, e.g. "GeofenceName".
+#'
+#' @return Character vector of the CSV paths written.
+#' @keywords internal
+.split_extract_chunks <- function(chunk_files, output_dir, split_by) {
+
+  split_dir <- file.path(output_dir, "by_geofence")
+  if (!dir.exists(split_dir)) dir.create(split_dir, recursive = TRUE)
+
+  slug <- function(x) {
+    s <- gsub("[^A-Za-z0-9._-]+", "_", trimws(x))
+    s <- gsub("^_+|_+$", "", s)
+    s <- substr(s, 1, 120)
+    ifelse(nzchar(s), s, "unnamed")
+  }
+
+  written <- character()   # paths already opened, so headers are written once
+  seen <- list()           # slug -> original value
+  total <- 0L
+
+  for (f in chunk_files) {
+    d <- readr::read_csv(f, show_col_types = FALSE, col_types = readr::cols(.default = "c"))
+
+    if (!split_by %in% names(d)) {
+      stop("split_by column '", split_by, "' not found in extract chunk ",
+           basename(f), ". Available: ", paste(names(d), collapse = ", "),
+           call. = FALSE)
+    }
+
+    total <- total + nrow(d)
+    groups <- split(seq_len(nrow(d)), d[[split_by]])
+
+    for (value in names(groups)) {
+      key <- slug(value)
+      seen[[key]] <- value
+      path <- file.path(split_dir, paste0(key, ".csv"))
+      readr::write_csv(d[groups[[value]], , drop = FALSE], path,
+                       append = path %in% written)
+      written <- union(written, path)
+    }
+
+    rm(d, groups)
+    gc()
+  }
+
+  cat("Split", total, "rows across", length(written), "geofence file(s)\n")
+
+  manifest <- data.frame(
+    file = paste0(names(seen), ".csv"),
+    value = unlist(seen, use.names = FALSE),
+    stringsAsFactors = FALSE
+  )
+  manifest_path <- file.path(split_dir, "manifest.csv")
+  readr::write_csv(manifest, manifest_path)
+  cat("Wrote", manifest_path, "\n")
+
+  cat("\n========================================\n")
+  cat("Split complete!\n")
+  cat("========================================\n")
+
+  written
 }
 
 # Core API Calling Functions ######################################################
@@ -835,6 +923,7 @@ pull_mobilescapes <- function(
     vintage,
     output_name = NULL,
     output_dir = "ea_output",
+    split_by = NULL,
     ...
 ) {
   .reject_legacy_args(list(...), "pull_mobilescapes")
@@ -948,7 +1037,7 @@ pull_mobilescapes <- function(
 
   # Create final output directory for this request's data
   final_output_dir <- file.path(output_base_dir, geography_name)
-  .merge_extract_chunks(temp_dir, final_output_dir, geography_name)
+  .merge_extract_chunks(temp_dir, final_output_dir, geography_name, split_by = split_by)
 
   cat("\n########################################\n")
   cat("COMPLETED:", geography_name, "\n")
