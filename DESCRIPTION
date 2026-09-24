@@ -1,7 +1,7 @@
 Package: environicsanalytics
 Type: Package
 Title: Environics Analytics (EA) API R Wrapper
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person(
       "Luca", "Carnegie",
