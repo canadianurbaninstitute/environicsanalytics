@@ -2,59 +2,70 @@
 % Please edit documentation in R/mobilescapes-api.R
 \name{pull_mobilescapes}
 \alias{pull_mobilescapes}
-\title{Submit and Pull MobileScapes API Request}
+\title{Submit and Pull MobileScapes Origins Extract}
 \usage{
 pull_mobilescapes(
-  start_datetime,
-  end_datetime,
-  geojson = NULL,
-  geofence_ids = NULL,
-  wkt_list = NULL,
-  use_weights = TRUE,
-  aggregate_polygons = TRUE,
-  aggregate_polygon_name = NULL,
-  append_prizm_segmentation = "prizm",
-  daily_time_filter = NULL,
-  ping_filter = NULL,
-  report_type = "celcdl",
-  data_vintage = NULL,
-  output_dir = "ea_output"
+  geofence_ids,
+  start_date,
+  end_date,
+  days_of_week = NULL,
+  time_of_day = "AllDay",
+  dwell = "Any",
+  country = "ca",
+  vintage,
+  output_name = NULL,
+  output_dir = "ea_output",
+  ...
 )
 }
 \arguments{
-\item{start_datetime}{Character. Start date/time in "YYYY-MM-DD hh:mm:ss" format.}
+\item{geofence_ids}{Character vector. EA geofence IDs (see
+[discover_mobilescapes_geofences()]). Only `"EA Standard"` geofences
+(ID prefix `E`) work here - `"Custom"` geofences (ID prefix `C`) are
+rejected with `400 Invalid geofence ID(s)`, even though the Envision UI
+presents both types identically. See docs/v4-to-v5-changes.md, verified.}
 
-\item{end_datetime}{Character. End date/time in "YYYY-MM-DD hh:mm:ss" format.}
+\item{start_date}{Character. Start date in "YYYY-MM-DD" format.}
 
-\item{geojson}{Character. Path to GeoJSON file.}
+\item{end_date}{Character. End date in "YYYY-MM-DD" format.}
 
-\item{geofence_ids}{Vector. Optional. EA geofence IDs.}
+\item{days_of_week}{Character vector. Optional. "Mon" through "Sun".}
 
-\item{wkt_list}{List. Optional. Well-Known Text polygon definitions.}
+\item{time_of_day}{Character. Optional. One of "AllDay", "Morning",
+"Afternoon", "Evening". Default "AllDay".}
 
-\item{use_weights}{Logical. Apply weights per device. Default is TRUE.}
+\item{dwell}{Character. Optional. One of "Any", "Short", "Medium",
+"Long". Default "Any".}
 
-\item{aggregate_polygons}{Logical. Aggregate results across polygons. Default is TRUE.}
+\item{country}{Character. 2-digit country code. Default "ca".}
 
-\item{aggregate_polygon_name}{Character. Optional. Name for aggregated results.}
+\item{vintage}{Character or numeric. Dataset vintage (e.g. "2026").}
 
-\item{append_prizm_segmentation}{Character. Optional. PRIZM segmentation.}
+\item{output_name}{Character. Optional. Base name for the output CSV file.
+Defaults to a name derived from the date range.}
 
-\item{daily_time_filter}{List. Optional. Filter for specific times/days.}
+\item{output_dir}{Character. Optional (default: "ea_output"). Output directory.}
 
-\item{ping_filter}{Character. Optional. Ping filter ("first" or NULL).}
-
-\item{report_type}{Character. Report type. Default is "celcdl".}
-
-\item{data_vintage}{Character. Optional. Data vintage.}
-
-\item{output_dir}{Character. Optional (default: "output"). Output directory.}
+\item{...}{Not used. Present only so that passing a removed v4 argument
+(e.g. `geojson`, `use_weights`, `daily_time_filter`) fails immediately
+with a migration hint instead of a generic "unused argument" error.}
 }
 \value{
-Creates output files in specified output directory. Returns directory of files as a character.
+Creates output files in specified output directory. Returns
+  directory of files as a character. The consolidated CSV is one row per
+  origin postal code, verified against a real extract, with columns
+  including `GeofenceName`, `Visits`, `PostalCode`, `LATITUDE`,
+  `LONGITUDE`, `Sunday`...`Saturday`, `January`...`December`, and the full
+  geography hierarchy (`PRCDDA`, `PRCDCSD`, `CMACT`, `FSA`, `PR`, etc. -
+  each with a matching `_NAME` column). There is no PRIZM segment column
+  and no time-of-day breakdown - see `time_of_day`/`dwell` above for the
+  only filtering available on those dimensions. `GeofenceName` means a
+  single extract can cover many geofences at once; unlike
+  [get_mobilescapes_origins()], results are not pooled across
+  `geofence_ids`.
 }
 \description{
-Authenticates with API using bearer token, submits a request to the MobileScapes API,
-handles GeoJSON splitting if needed, polls for completion, downloads data from Azure,
-and merges chunks into consolidated CEL and CDL CSV files.
+Authenticates with the API using a bearer token, submits an Origins
+Extract request, polls for completion, downloads the CSV chunks from
+Azure, and merges them into a single consolidated CSV file.
 }

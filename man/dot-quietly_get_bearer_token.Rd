@@ -11,14 +11,7 @@ Character. Valid bearer token string
 }
 \description{
 Returns a valid bearer token, refreshing if necessary, without verbosity.
+Used internally by [.build_request()] - unlike [get_bearer_token()], this
+does not print progress messages.
 }
-\examples{
-\dontrun{
-init_credentials(
-  client_id = Sys.getenv("CLIENT_ID"),
-  client_secret = Sys.getenv("CLIENT_SECRET")
-)
-token <- get_bearer_token()
-}
-
-}
+\keyword{internal}
